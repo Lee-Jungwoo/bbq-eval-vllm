@@ -1,0 +1,15 @@
+[pipeline] run_id=Qwen2.5-1.5B-Instruct_bfloat16_0accab82
+[prepare] model=Qwen/Qwen2.5-1.5B-Instruct revision=main dtype=bfloat16
+[prepare] categories=['Age', 'Disability_status', 'Gender_identity', 'Nationality', 'Physical_appearance', 'Race_ethnicity', 'Religion', 'SES', 'Sexual_orientation']
+[prepare] label token variant: plain (option_letters=['A', 'B', 'C'], ids={'A': 32, 'B': 33, 'C': 34})
+Traceback (most recent call last):
+  File "/home/jungwoo/BBQ/pipeline/pipeline.py", line 464, in <module>
+    main()
+  File "/home/jungwoo/BBQ/pipeline/pipeline.py", line 458, in main
+    cmd_prepare(config, run_dir)
+  File "/home/jungwoo/BBQ/pipeline/pipeline.py", line 232, in cmd_prepare
+    target_locs = load_target_locs(REPO_ROOT / "analysis_scripts" / "additional_metadata.csv")
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jungwoo/BBQ/pipeline/pipeline.py", line 148, in load_target_locs
+    import pandas as pd
+ModuleNotFoundError: No module named 'pandas'

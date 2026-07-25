@@ -1,0 +1,3 @@
+[pipeline] run_id=Qwen2.5-0.5B-Instruct_bfloat16_3926da33
+[collect] wrote 31372 new records to /home/jungwoo/BBQ/pipeline/runs/Qwen2.5-0.5B-Instruct_bfloat16_3926da33/records.jsonl (0 already present)
+[collect] mean prob_mass_captured = 0.9949 (n=31372)

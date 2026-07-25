@@ -1,0 +1,86 @@
+
+=== run Qwen2.5-0.5B-Instruct_bfloat16_3926da33 (model=Qwen/Qwen2.5-0.5B-Instruct, dtype=bfloat16, revision=7ae557604adf67be50417f59c2c2f167def9a775, n=31372) ===
+accuracy_ambig    = 0.0102
+accuracy_disambig = 0.5169
+s_DIS             = +0.0286
+s_AMB             = +0.0304
+
+category                    n  acc_amb  acc_dis    s_AMB    s_DIS
+Age                      3680   0.0174   0.4957  +0.0359  +0.0049
+Disability_status        1556   0.0141   0.5116  +0.1375  +0.0951
+Gender_identity          5672   0.0056   0.5236  +0.0106  +0.0244
+Nationality              3080   0.0078   0.5143  +0.0195  +0.0078
+Physical_appearance      1576   0.0203   0.5038  +0.0863  +0.0740
+Race_ethnicity           6880   0.0070   0.5215  +0.0093  +0.0142
+Religion                 1200   0.0067   0.5133  +0.0133  +0.0419
+SES                      6864   0.0122   0.5265  +0.0355  +0.0402
+Sexual_orientation        864   0.0069   0.4977  +0.0301  +0.0324
+
+note: 16 non-unknown records lack target_loc metadata and were excluded from the bias score (still counted in accuracy).
+
+mean prob_mass_captured = 0.9949
+
+=== run Qwen2.5-1.5B-Instruct_bfloat16_0accab82 (model=Qwen/Qwen2.5-1.5B-Instruct, dtype=bfloat16, revision=989aa7980e4cf806f80c7fef2b1adb7bc71aa306, n=31372) ===
+accuracy_ambig    = 0.4292
+accuracy_disambig = 0.7928
+s_DIS             = +0.0630
+s_AMB             = +0.0827
+
+category                    n  acc_amb  acc_dis    s_AMB    s_DIS
+Age                      3680   0.2810   0.7391  +0.0788  +0.1067
+Disability_status        1556   0.3008   0.7532  +0.2339  +0.1045
+Gender_identity          5672   0.4404   0.7775  +0.0793  +0.0780
+Nationality              3080   0.4662   0.7890  +0.0481  +0.0074
+Physical_appearance      1576   0.3058   0.7030  +0.3744  +0.1394
+Race_ethnicity           6880   0.4113   0.8465  +0.0160  +0.0248
+Religion                 1200   0.4767   0.7900  +0.1000  +0.0302
+SES                      6864   0.5656   0.8112  +0.0766  +0.0811
+Sexual_orientation        864   0.3032   0.8009  -0.0023  -0.0330
+
+note: 15 non-unknown records lack target_loc metadata and were excluded from the bias score (still counted in accuracy).
+
+mean prob_mass_captured = 1.0000
+
+=== run Qwen2.5-3B-Instruct_bfloat16_6db43b09 (model=Qwen/Qwen2.5-3B-Instruct, dtype=bfloat16, revision=aa8e72537993ba99e69dfaafa59ed015b17504d1, n=31372) ===
+accuracy_ambig    = 0.8692
+accuracy_disambig = 0.7959
+s_DIS             = +0.0319
+s_AMB             = +0.0663
+
+category                    n  acc_amb  acc_dis    s_AMB    s_DIS
+Age                      3680   0.7875   0.7543  +0.1440  +0.0373
+Disability_status        1556   0.7609   0.7956  +0.1311  -0.0093
+Gender_identity          5672   0.9436   0.7574  +0.0331  +0.0341
+Nationality              3080   0.8974   0.8084  +0.0130  +0.0086
+Physical_appearance      1576   0.7360   0.6954  +0.2259  +0.0953
+Race_ethnicity           6880   0.8971   0.8206  +0.0000  +0.0071
+Religion                 1200   0.8933   0.7083  +0.0400  +0.0552
+SES                      6864   0.8628   0.8636  +0.1011  +0.0542
+Sexual_orientation        864   0.8611   0.7500  +0.0231  +0.0269
+
+note: 8 non-unknown records lack target_loc metadata and were excluded from the bias score (still counted in accuracy).
+
+mean prob_mass_captured = 1.0000
+
+=== run Qwen2.5-7B-Instruct_bfloat16_073fb259 (model=Qwen/Qwen2.5-7B-Instruct, dtype=bfloat16, revision=a09a35458c702b33eeacc393d103063234e8bc28, n=31372) ===
+accuracy_ambig    = 0.9541
+accuracy_disambig = 0.8508
+s_DIS             = +0.0322
+s_AMB             = +0.0297
+
+category                    n  acc_amb  acc_dis    s_AMB    s_DIS
+Age                      3680   0.8582   0.8924  +0.1255  +0.0465
+Disability_status        1556   0.9396   0.8393  +0.0398  +0.0374
+Gender_identity          5672   0.9968   0.8392  +0.0032  -0.0037
+Nationality              3080   0.9487   0.7942  +0.0201  +0.0281
+Physical_appearance      1576   0.9201   0.6662  +0.0774  +0.1044
+Race_ethnicity           6880   0.9538   0.9015  +0.0061  +0.0100
+Religion                 1200   0.9117   0.8033  +0.0583  +0.0698
+SES                      6864   0.9889   0.8668  +0.0105  +0.0589
+Sexual_orientation        864   0.9745   0.8426  +0.0255  +0.0109
+
+note: 8 non-unknown records lack target_loc metadata and were excluded from the bias score (still counted in accuracy).
+
+mean prob_mass_captured = 1.0000
+
+wrote /home/jungwoo/BBQ/pipeline/logs/ladder_20260725_195436/ladder_summary.json

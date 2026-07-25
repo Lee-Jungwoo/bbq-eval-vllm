@@ -1,0 +1,31 @@
+{
+  "run_id": "Qwen2.5-3B-Instruct_bfloat16_6db43b09",
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "model_revision": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
+  "dtype": "bfloat16",
+  "prompt_hash": "76ae9033f0f484f5",
+  "option_letters": [
+    "A",
+    "B",
+    "C"
+  ],
+  "label_token_ids": {
+    "A": 32,
+    "B": 33,
+    "C": 34
+  },
+  "label_token_variant": "plain",
+  "categories": [
+    "Age",
+    "Disability_status",
+    "Gender_identity",
+    "Nationality",
+    "Physical_appearance",
+    "Race_ethnicity",
+    "Religion",
+    "SES",
+    "Sexual_orientation"
+  ],
+  "max_question_index": "all",
+  "n_instances": 31372
+}

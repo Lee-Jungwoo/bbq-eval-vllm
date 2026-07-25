@@ -1,0 +1,12 @@
+[pipeline] run_id=Qwen2.5-3B-Instruct_bfloat16_6db43b09
+[prepare] model=Qwen/Qwen2.5-3B-Instruct revision=main dtype=bfloat16
+[prepare] categories=['Age', 'Disability_status', 'Gender_identity', 'Nationality', 'Physical_appearance', 'Race_ethnicity', 'Religion', 'SES', 'Sexual_orientation']
+[prepare] label token variant: plain (option_letters=['A', 'B', 'C'], ids={'A': 32, 'B': 33, 'C': 34})
+[prepare] 31372 instances
+[prepare] wrote /home/jungwoo/BBQ/pipeline/runs/Qwen2.5-3B-Instruct_bfloat16_6db43b09/requests.jsonl
+[prepare] next steps:
+  scp /home/jungwoo/BBQ/pipeline/runs/Qwen2.5-3B-Instruct_bfloat16_6db43b09/requests.jsonl serve_logprobs.py <lab-server>:
+  # on the server:
+  python serve_logprobs.py --input requests.jsonl --output responses.jsonl --dtype bfloat16 --revision aa8e72537993ba99e69dfaafa59ed015b17504d1
+  scp <lab-server>:responses.jsonl /home/jungwoo/BBQ/pipeline/runs/Qwen2.5-3B-Instruct_bfloat16_6db43b09/
+  python pipeline.py collect

@@ -1,0 +1,9 @@
+{
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "dtype": "bfloat16",
+  "revision": "main",
+  "categories": "all",
+  "max_question_index": "all",
+  "run_id": null,
+  "prob_mass_warn_threshold": 0.9
+}

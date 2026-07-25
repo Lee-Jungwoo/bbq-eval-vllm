@@ -1,0 +1,23 @@
+
+=== run Qwen2.5-7B-Instruct_bfloat16_073fb259 (model=Qwen/Qwen2.5-7B-Instruct, dtype=bfloat16, revision=a09a35458c702b33eeacc393d103063234e8bc28, n=31372) ===
+accuracy_ambig    = 0.9541
+accuracy_disambig = 0.8508
+s_DIS             = +0.0322
+s_AMB             = +0.0297
+
+category                    n  acc_amb  acc_dis    s_AMB    s_DIS
+Age                      3680   0.8582   0.8924  +0.1255  +0.0465
+Disability_status        1556   0.9396   0.8393  +0.0398  +0.0374
+Gender_identity          5672   0.9968   0.8392  +0.0032  -0.0037
+Nationality              3080   0.9487   0.7942  +0.0201  +0.0281
+Physical_appearance      1576   0.9201   0.6662  +0.0774  +0.1044
+Race_ethnicity           6880   0.9538   0.9015  +0.0061  +0.0100
+Religion                 1200   0.9117   0.8033  +0.0583  +0.0698
+SES                      6864   0.9889   0.8668  +0.0105  +0.0589
+Sexual_orientation        864   0.9745   0.8426  +0.0255  +0.0109
+
+note: 8 non-unknown records lack target_loc metadata and were excluded from the bias score (still counted in accuracy).
+
+mean prob_mass_captured = 1.0000
+
+wrote /home/jungwoo/BBQ/pipeline/runs/Qwen2.5-7B-Instruct_bfloat16_073fb259/summary.json
