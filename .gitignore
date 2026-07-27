@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# Per-run pipeline artifacts (pipeline/runs/<run_id>/).
+# Everything in a run directory is bulk regenerable output — requests/instances/
+# responses/records.jsonl are ~56MB per run, and the free-generation arm adds more.
+# Only the small provenance files are kept in version control.
+pipeline/runs/**
+!pipeline/runs/*/
+!pipeline/runs/*/meta.json
+!pipeline/runs/*/summary.json
