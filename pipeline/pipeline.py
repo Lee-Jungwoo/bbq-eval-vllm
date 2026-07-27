@@ -28,6 +28,7 @@ import argparse
 import hashlib
 import json
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -307,7 +308,40 @@ def cmd_prepare(config, run_dir):
 
 # ---------------------------------------------------------------- collect
 
-def derive_record(instance, logprobs, meta):
+# A standalone A/B/C in the generated text. Case-sensitive on purpose: the
+# lowercase article "a" would otherwise match on every other sentence.
+GEN_LETTER_RE = re.compile(r"\b([ABC])\b")
+GEN_PREFIX_RE = re.compile(r"([ABC])\s*[:.)\-]")
+
+
+def parse_generation(text):
+    """Map a free-form generation to (letter index, rule that fired).
+
+    The cascade runs most-reliable first, and records which rule matched so the
+    aggregate can report how much of the parse rate rests on the loose ones. A
+    leading "A:"-style label wins over any later letter, since that is the model
+    stating its choice; two different bare letters are 'ambiguous', not a guess.
+    """
+    if text is None:
+        return None, "no_generation"
+    stripped = text.strip()
+    if not stripped:
+        return None, "empty"
+    if stripped.upper() in LETTERS:
+        return LETTERS.index(stripped.upper()), "exact"
+    prefix = GEN_PREFIX_RE.match(stripped)
+    if prefix:
+        return LETTERS.index(prefix.group(1)), "letter_prefix"
+    found = GEN_LETTER_RE.findall(stripped)
+    if len(set(found)) > 1:
+        return None, "ambiguous"
+    if not found:
+        return None, "no_match"
+    return LETTERS.index(found[0]), "regex"
+
+
+def derive_record(instance, response, meta):
+    logprobs = response["logprobs"]
     filled = {letter: (lp if lp is not None else -math.inf)
               for letter, lp in logprobs.items()}
     pred = max(range(3), key=lambda i: filled[LETTERS[i]])
@@ -318,6 +352,9 @@ def derive_record(instance, logprobs, meta):
     answer_groups = instance["answer_groups"]
     pred_group = answer_groups[pred]
     is_unknown = pred_group == "unknown"
+
+    generation = response.get("text")
+    pred_gen, parse_status = parse_generation(generation)
 
     target_loc = instance["target_loc"]
     if is_unknown or target_loc is None:
@@ -353,6 +390,15 @@ def derive_record(instance, logprobs, meta):
         "is_target": is_target,
         "is_biased": is_biased,
         "correct": pred == instance["label"],
+        # Free-generation arm. Present only when the server ran with
+        # --max-tokens > 1; `pred`/`correct` above stay first-token-based so
+        # every downstream metric keeps its original meaning.
+        "generation": generation,
+        "finish_reason": response.get("finish_reason"),
+        "pred_gen": pred_gen,
+        "parse_status": parse_status,
+        "agree": None if pred_gen is None else pred_gen == pred,
+        "correct_gen": None if pred_gen is None else pred_gen == instance["label"],
         "run_id": meta["run_id"],
         "model": meta["model"],
         "model_revision": meta["model_revision"],
@@ -386,7 +432,7 @@ def cmd_collect(config, run_dir):
         for line in f:
             if line.strip():
                 obj = json.loads(line)
-                responses[obj["index"]] = obj["logprobs"]
+                responses[obj["index"]] = obj
 
     records_path = run_dir / "records.jsonl"
     already_done = set()
@@ -405,13 +451,13 @@ def cmd_collect(config, run_dir):
             key = (instance["category"], instance["example_id"])
             if key in already_done:
                 continue
-            logprobs = responses.get(instance["index"])
-            if logprobs is None:
+            response = responses.get(instance["index"])
+            if response is None:
                 missing += 1
                 continue
-            if any(lp is None for lp in logprobs.values()):
+            if any(lp is None for lp in response["logprobs"].values()):
                 null_logprobs += 1
-            record = derive_record(instance, logprobs, meta)
+            record = derive_record(instance, response, meta)
             out.write(json.dumps(record, ensure_ascii=False) + "\n")
             written += 1
 
@@ -425,10 +471,29 @@ def cmd_collect(config, run_dir):
               f"the server's top-k logprobs (treated as -inf for argmax)")
 
     prob_masses = []
+    statuses = {}
+    n_agree = n_comparable = 0
     with open(records_path, encoding="utf-8") as f:
         for line in f:
             if line.strip():
-                prob_masses.append(json.loads(line)["prob_mass_captured"])
+                record = json.loads(line)
+                prob_masses.append(record["prob_mass_captured"])
+                status = record.get("parse_status")
+                if status is not None:
+                    statuses[status] = statuses.get(status, 0) + 1
+                if record.get("agree") is not None:
+                    n_comparable += 1
+                    n_agree += record["agree"]
+
+    if statuses.get("no_generation", 0) < sum(statuses.values()):
+        total = sum(statuses.values())
+        print(f"[collect] generation parse status (n={total}):")
+        for status in sorted(statuses, key=lambda s: -statuses[s]):
+            print(f"    {status:<14} {statuses[status]:>6} ({statuses[status] / total * 100:5.1f}%)")
+        if n_comparable:
+            print(f"[collect] first-token vs generation agreement = "
+                  f"{n_agree / n_comparable:.4f} ({n_agree}/{n_comparable})")
+
     if prob_masses:
         mean_mass = sum(prob_masses) / len(prob_masses)
         threshold = config["prob_mass_warn_threshold"]

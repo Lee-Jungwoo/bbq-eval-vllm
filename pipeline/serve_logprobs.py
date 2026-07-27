@@ -10,6 +10,10 @@ output file. Logprobs are log-softmax over the full vocab at the assistant's
 first token position, so the local side can compute prob_mass_captured exactly.
 A label token that falls outside the top-k logprobs is emitted as null.
 
+With --max-tokens > 1 each line also carries "text" and "finish_reason" (the
+free-generation arm). The logprobs field is unchanged and still describes the
+first token, so both scoring methods come out of the same forward pass.
+
 Resume: already-present indices in the output file are skipped, and results are
 flushed after every batch, so an interrupted run continues where it stopped.
 
@@ -70,6 +74,9 @@ def main():
     parser.add_argument("--tensor-parallel-size", type=int, default=1)
     parser.add_argument("--gpu-memory-utilization", type=float, default=0.9)
     parser.add_argument("--max-model-len", type=int, default=None)
+    parser.add_argument("--max-tokens", type=int, default=1,
+                        help="1 = first-token logprobs only; >1 also decodes greedily "
+                             "and emits the generated text (free-generation arm)")
     args = parser.parse_args()
 
     header, items = read_requests(args.input)
@@ -94,9 +101,15 @@ def main():
         max_model_len=args.max_model_len,
     )
     tokenizer = llm.get_tokenizer()
-    # temperature=1.0 so returned logprobs are the unscaled log-softmax; the
-    # sampled token itself is ignored, only the logprob dict is used.
-    sampling = SamplingParams(temperature=1.0, top_p=1.0, max_tokens=1,
+    # max_tokens=1: temperature=1.0 so returned logprobs are the unscaled
+    # log-softmax; the sampled token itself is ignored, only the logprob dict is.
+    # max_tokens>1: the decoded text is the point, so greedy (temperature=0) for
+    # reproducibility. logprobs[0] is still the first-token distribution, which
+    # makes the two arms comparable on one forward pass -- but temperature is no
+    # longer the identity, so verify the first-token logprobs against an existing
+    # max_tokens=1 run before trusting them (see pipeline README).
+    sampling = SamplingParams(temperature=0.0 if args.max_tokens > 1 else 1.0,
+                              top_p=1.0, max_tokens=args.max_tokens,
                               logprobs=args.top_logprobs)
 
     with open(args.output, "a", encoding="utf-8") as out:
@@ -110,7 +123,8 @@ def main():
             ]
             outputs = llm.generate(prompts, sampling)
             for item, output in zip(batch, outputs):
-                lp = output.outputs[0].logprobs[0]  # dict: token_id -> Logprob
+                completion = output.outputs[0]
+                lp = completion.logprobs[0]  # dict: token_id -> Logprob
                 record = {
                     "index": item["index"],
                     "logprobs": {
@@ -118,7 +132,10 @@ def main():
                         for letter, tid in label_token_ids.items()
                     },
                 }
-                out.write(json.dumps(record) + "\n")
+                if args.max_tokens > 1:
+                    record["text"] = completion.text
+                    record["finish_reason"] = completion.finish_reason
+                out.write(json.dumps(record, ensure_ascii=False) + "\n")
             out.flush()
             print(f"[serve_logprobs] {min(start + args.batch_size, len(todo))}/{len(todo)} done")
 

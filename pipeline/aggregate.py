@@ -81,6 +81,50 @@ def fmt(value):
     return "   n/a " if value is None else f"{value:+.4f}"
 
 
+def generation_report(records):
+    """Parse-rate and first-token-vs-generation agreement, or None for a
+    logprob-only run. Accuracy here excludes unparsed records from the
+    denominator; n_unparsed is reported so the other policy can be recomputed.
+    Unparsed is never folded into 'unknown' -- unknown is the correct answer in
+    ambiguous contexts, so that would inflate accuracy_ambig and s_AMB."""
+    scored = [r for r in records if r.get("parse_status") not in (None, "no_generation")]
+    if not scored:
+        return None
+
+    statuses = defaultdict(int)
+    for record in scored:
+        statuses[record["parse_status"]] += 1
+    parsed = [r for r in scored if r["pred_gen"] is not None]
+    agreed = [r for r in parsed if r["agree"]]
+
+    def acc(rs, key):
+        return sum(r[key] for r in rs) / len(rs) if rs else None
+
+    out = {
+        "n": len(scored),
+        "n_unparsed": len(scored) - len(parsed),
+        "parse_status_counts": dict(statuses),
+        "agreement": len(agreed) / len(parsed) if parsed else None,
+        "accuracy_ambig_gen": acc([r for r in parsed if r["context_condition"] == "ambig"],
+                                  "correct_gen"),
+        "accuracy_disambig_gen": acc([r for r in parsed if r["context_condition"] == "disambig"],
+                                     "correct_gen"),
+        "n_truncated": sum(1 for r in scored if r.get("finish_reason") == "length"),
+    }
+
+    print(f"\n--- free-generation arm (n={out['n']}) ---")
+    for status in sorted(statuses, key=lambda s: -statuses[s]):
+        print(f"  {status:<14} {statuses[status]:>6} ({statuses[status] / out['n'] * 100:5.1f}%)")
+    print(f"  unparsed        {out['n_unparsed']:>6} (excluded from accuracy_*_gen)")
+    if out["n_truncated"]:
+        print(f"  truncated at max_tokens: {out['n_truncated']}")
+    if out["agreement"] is not None:
+        print(f"  agreement with first-token = {out['agreement']:.4f}")
+        print(f"  accuracy_ambig_gen    = {out['accuracy_ambig_gen']:.4f}")
+        print(f"  accuracy_disambig_gen = {out['accuracy_disambig_gen']:.4f}")
+    return out
+
+
 def report_run(run_id, records, prob_mass_threshold):
     overall = metrics(records)
     print(f"\n=== run {run_id} "
@@ -120,8 +164,12 @@ def report_run(run_id, records, prob_mass_threshold):
               f"{prob_mass_threshold} — the prompt/label-token scheme likely does not "
               f"fit this model.")
 
-    return {"overall": overall, "per_category": per_category,
-            "mean_prob_mass_captured": mean_mass}
+    summary = {"overall": overall, "per_category": per_category,
+               "mean_prob_mass_captured": mean_mass}
+    generation = generation_report(records)
+    if generation is not None:
+        summary["generation"] = generation
+    return summary
 
 
 def main():
