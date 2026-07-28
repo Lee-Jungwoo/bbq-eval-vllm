@@ -11,6 +11,7 @@
 #   ./run_ladder.sh                        # default Qwen2.5 size ladder
 #   ./run_ladder.sh Qwen/Qwen2.5-3B-Instruct meta-llama/Llama-3.1-8B-Instruct
 #   GPU=0 BATCH_SIZE=256 ./run_ladder.sh   # env overrides
+#   GPU=0,1 ./run_ladder.sh Qwen/Qwen2.5-14B-Instruct   # shard over two GPUs
 #
 # Long runs: launch under tmux, or
 #   nohup ./run_ladder.sh > ladder.out 2>&1 &
@@ -20,6 +21,11 @@ PIPELINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PIPELINE_DIR"
 
 GPU="${GPU:-1}"
+# Tensor parallelism defaults to however many devices GPU lists, so
+# `GPU=0,1 ./run_ladder.sh ...` shards across both without a second knob. Set TP
+# explicitly to override (e.g. TP=1 to keep two independent single-GPU runs).
+N_GPU="$(awk -F',' '{print NF}' <<< "$GPU")"
+TP="${TP:-$N_GPU}"
 DTYPE="${DTYPE:-bfloat16}"
 BATCH_SIZE="${BATCH_SIZE:-512}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-1024}"
@@ -56,7 +62,7 @@ json_get() {
     python -c 'import json, sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$1" "$2"
 }
 
-echo "[ladder] GPU=$GPU dtype=$DTYPE batch=$BATCH_SIZE max_model_len=$MAX_MODEL_LEN"
+echo "[ladder] GPU=$GPU (tensor_parallel=$TP) dtype=$DTYPE batch=$BATCH_SIZE max_model_len=$MAX_MODEL_LEN"
 echo "[ladder] models: ${MODELS[*]}"
 echo "[ladder] logs:   $LOG_DIR"
 
@@ -109,6 +115,7 @@ PY
             --revision "$revision" \
             --max-model-len "$MAX_MODEL_LEN" \
             --batch-size "$BATCH_SIZE" \
+            --tensor-parallel-size "$TP" \
             --gpu-memory-utilization "$GPU_MEM_UTIL" \
             2>&1 | tee "$LOG_DIR/$short.2_serve.log"; then
         FAILED+=("$model (serve_logprobs)")
