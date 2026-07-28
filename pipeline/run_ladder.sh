@@ -30,6 +30,10 @@ DTYPE="${DTYPE:-bfloat16}"
 BATCH_SIZE="${BATCH_SIZE:-512}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-1024}"
 GPU_MEM_UTIL="${GPU_MEM_UTIL:-0.90}"
+# vLLM scheduler concurrency. Empty = vLLM's own default. Its sampler warmup
+# allocates a vocab-wide logits row per sequence, which is what OOMs on a big
+# model long before the KV cache does -- BATCH_SIZE does not affect it.
+MAX_NUM_SEQS="${MAX_NUM_SEQS:-}"
 CONFIG="${CONFIG:-$PIPELINE_DIR/config.json}"
 
 MODELS=("$@")
@@ -117,6 +121,7 @@ PY
             --batch-size "$BATCH_SIZE" \
             --tensor-parallel-size "$TP" \
             --gpu-memory-utilization "$GPU_MEM_UTIL" \
+            ${MAX_NUM_SEQS:+--max-num-seqs $MAX_NUM_SEQS} \
             2>&1 | tee "$LOG_DIR/$short.2_serve.log"; then
         FAILED+=("$model (serve_logprobs)")
         continue

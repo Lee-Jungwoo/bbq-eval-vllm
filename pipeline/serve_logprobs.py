@@ -74,6 +74,12 @@ def main():
     parser.add_argument("--tensor-parallel-size", type=int, default=1)
     parser.add_argument("--gpu-memory-utilization", type=float, default=0.9)
     parser.add_argument("--max-model-len", type=int, default=None)
+    parser.add_argument("--max-num-seqs", type=int, default=None,
+                        help="vLLM scheduler concurrency (default: vLLM's own). The "
+                             "sampler warms up with this many dummy requests, each "
+                             "holding a vocab-wide logits row, so lower it (64, 32) if "
+                             "init OOMs. Unrelated to --batch-size, which only sets how "
+                             "many prompts are handed to the engine at a time.")
     parser.add_argument("--max-tokens", type=int, default=1,
                         help="1 = first-token logprobs only; >1 also decodes greedily "
                              "and emits the generated text (free-generation arm)")
@@ -91,6 +97,10 @@ def main():
 
     from vllm import LLM, SamplingParams
 
+    llm_kwargs = {}
+    if args.max_num_seqs is not None:
+        llm_kwargs["max_num_seqs"] = args.max_num_seqs
+
     llm = LLM(
         model=model,
         revision=args.revision,
@@ -99,6 +109,7 @@ def main():
         tensor_parallel_size=args.tensor_parallel_size,
         gpu_memory_utilization=args.gpu_memory_utilization,
         max_model_len=args.max_model_len,
+        **llm_kwargs,
     )
     tokenizer = llm.get_tokenizer()
     # max_tokens=1: temperature=1.0 so returned logprobs are the unscaled
