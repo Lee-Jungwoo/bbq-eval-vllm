@@ -97,31 +97,55 @@ def generation_report(records):
     parsed = [r for r in scored if r["pred_gen"] is not None]
     agreed = [r for r in parsed if r["agree"]]
 
-    def acc(rs, key):
-        return sum(r[key] for r in rs) / len(rs) if rs else None
+    def rate(rs):
+        """Share of rs that failed to parse."""
+        return sum(1 for r in rs if r["pred_gen"] is None) / len(rs) if rs else None
+
+    def acc(rs, exclude_unparsed):
+        """Generation accuracy under either unparsed policy: dropped from the
+        denominator, or counted as wrong."""
+        if exclude_unparsed:
+            rs = [r for r in rs if r["pred_gen"] is not None]
+            return sum(r["correct_gen"] for r in rs) / len(rs) if rs else None
+        return sum(bool(r["correct_gen"]) for r in rs) / len(rs) if rs else None
+
+    by_condition = {c: [r for r in scored if r["context_condition"] == c]
+                    for c in ("ambig", "disambig")}
 
     out = {
         "n": len(scored),
         "n_unparsed": len(scored) - len(parsed),
+        "parse_failure_rate": rate(scored),
+        # Reported per condition because excluding unparsed records is only safe
+        # if failures are spread evenly: a model that hedges ("Not enough
+        # information") on ambiguous items drops exactly the items where it was
+        # about to answer 'unknown', which would move accuracy_ambig and s_AMB.
+        "parse_failure_rate_ambig": rate(by_condition["ambig"]),
+        "parse_failure_rate_disambig": rate(by_condition["disambig"]),
         "parse_status_counts": dict(statuses),
         "agreement": len(agreed) / len(parsed) if parsed else None,
-        "accuracy_ambig_gen": acc([r for r in parsed if r["context_condition"] == "ambig"],
-                                  "correct_gen"),
-        "accuracy_disambig_gen": acc([r for r in parsed if r["context_condition"] == "disambig"],
-                                     "correct_gen"),
+        "accuracy_ambig_gen": acc(by_condition["ambig"], True),
+        "accuracy_disambig_gen": acc(by_condition["disambig"], True),
+        "accuracy_ambig_gen_unparsed_incorrect": acc(by_condition["ambig"], False),
+        "accuracy_disambig_gen_unparsed_incorrect": acc(by_condition["disambig"], False),
         "n_truncated": sum(1 for r in scored if r.get("finish_reason") == "length"),
     }
 
     print(f"\n--- free-generation arm (n={out['n']}) ---")
     for status in sorted(statuses, key=lambda s: -statuses[s]):
         print(f"  {status:<14} {statuses[status]:>6} ({statuses[status] / out['n'] * 100:5.1f}%)")
-    print(f"  unparsed        {out['n_unparsed']:>6} (excluded from accuracy_*_gen)")
+    print(f"  unparsed        {out['n_unparsed']:>6} ({out['parse_failure_rate'] * 100:5.1f}%)"
+          f"  [ambig {out['parse_failure_rate_ambig'] * 100:.1f}% / "
+          f"disambig {out['parse_failure_rate_disambig'] * 100:.1f}%]")
     if out["n_truncated"]:
         print(f"  truncated at max_tokens: {out['n_truncated']}")
     if out["agreement"] is not None:
         print(f"  agreement with first-token = {out['agreement']:.4f}")
-        print(f"  accuracy_ambig_gen    = {out['accuracy_ambig_gen']:.4f}")
-        print(f"  accuracy_disambig_gen = {out['accuracy_disambig_gen']:.4f}")
+        print(f"\n  {'':<22}{'exclude':>9}{'as-wrong':>10}   (unparsed policy)")
+        print(f"  {'accuracy_ambig_gen':<22}{out['accuracy_ambig_gen']:>9.4f}"
+              f"{out['accuracy_ambig_gen_unparsed_incorrect']:>10.4f}")
+        print(f"  {'accuracy_disambig_gen':<22}{out['accuracy_disambig_gen']:>9.4f}"
+              f"{out['accuracy_disambig_gen_unparsed_incorrect']:>10.4f}")
     return out
 
 

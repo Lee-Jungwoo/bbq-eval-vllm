@@ -15,3 +15,8 @@ pipeline/runs/**
 !pipeline/runs/*/
 !pipeline/runs/*/meta.json
 !pipeline/runs/*/summary.json
+
+
+
+# python notebooks
+*.ipynb

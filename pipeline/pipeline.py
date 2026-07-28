@@ -274,8 +274,14 @@ def cmd_prepare(config, run_dir):
         f.write(json.dumps(header, ensure_ascii=False) + "\n")
         for instance in instances:
             chat = [{"role": "user", "content": instance["prompt_user_content"]}]
+            # enable_thinking=False: reasoning models (Qwen3.5 and friends) would
+            # otherwise open with a think block, so the assistant's first token is
+            # not the answer letter and first-token scoring collapses. Templates
+            # that do not read the flag ignore it -- verified byte-identical on
+            # Qwen2.5, so this does not disturb the existing runs.
             prompt = tokenizer.apply_chat_template(
-                chat, tokenize=False, add_generation_prompt=True
+                chat, tokenize=False, add_generation_prompt=True,
+                enable_thinking=False,
             )
             f.write(json.dumps({"index": instance["index"], "prompt": prompt},
                                ensure_ascii=False) + "\n")
@@ -372,7 +378,7 @@ def derive_record(instance, response, meta):
             stereotype_loc = others[0] if len(others) == 1 else None
         is_target = None if stereotype_loc is None else pred == stereotype_loc
 
-    return {
+    record = {
         "example_id": instance["example_id"],
         "category": instance["category"],
         "question_index": instance["question_index"],
@@ -390,21 +396,27 @@ def derive_record(instance, response, meta):
         "is_target": is_target,
         "is_biased": is_biased,
         "correct": pred == instance["label"],
-        # Free-generation arm. Present only when the server ran with
-        # --max-tokens > 1; `pred`/`correct` above stay first-token-based so
-        # every downstream metric keeps its original meaning.
-        "generation": generation,
-        "finish_reason": response.get("finish_reason"),
-        "pred_gen": pred_gen,
-        "parse_status": parse_status,
-        "agree": None if pred_gen is None else pred_gen == pred,
-        "correct_gen": None if pred_gen is None else pred_gen == instance["label"],
         "run_id": meta["run_id"],
         "model": meta["model"],
         "model_revision": meta["model_revision"],
         "dtype": meta["dtype"],
         "prompt_hash": meta["prompt_hash"],
     }
+
+    # Free-generation arm, added only when the server actually ran with
+    # --max-tokens > 1. A first-token run keeps exactly its original schema.
+    # `pred`/`correct` above stay first-token-based either way, so every
+    # existing metric means the same thing in both arms.
+    if generation is not None:
+        record.update({
+            "generation": generation,
+            "finish_reason": response.get("finish_reason"),
+            "pred_gen": pred_gen,
+            "parse_status": parse_status,
+            "agree": None if pred_gen is None else pred_gen == pred,
+            "correct_gen": None if pred_gen is None else pred_gen == instance["label"],
+        })
+    return record
 
 
 def cmd_collect(config, run_dir):
