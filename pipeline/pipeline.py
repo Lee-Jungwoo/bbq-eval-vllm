@@ -69,6 +69,14 @@ PROMPT_HASH = hashlib.sha256(PROMPT_TEMPLATE.encode("utf-8")).hexdigest()[:16]
 
 LETTERS = ["A", "B", "C"]
 
+# requests.jsonl schema. 1 = {"prompt": <chat-templated text>}, re-encoded by the
+# server. 2 = {"prompt_token_ids": [...]}, tokenized once here. Schema 1 is unsafe
+# for tokenizers whose chat template is not a jinja string: transformers' Mistral
+# backend renders "<s>[INST]...[/INST]" as plain text, and re-encoding that turns
+# every control token into literal characters. Schema 1 files are still accepted by
+# serve_logprobs.py so finished runs stay reproducible.
+REQUEST_SCHEMA = 2
+
 
 # ---------------------------------------------------------------- config
 
@@ -143,6 +151,25 @@ def resolve_revision_sha(model, revision):
 
 
 # ---------------------------------------------------------------- data loading
+
+def encode_chat_prompt(tokenizer, user_content):
+    """Chat-template one user turn straight to token ids.
+
+    tokenize=True on purpose: it is the only path that is correct for every
+    tokenizer backend (see REQUEST_SCHEMA). enable_thinking=False keeps reasoning
+    models from opening with a think block, which would push the answer letter off
+    the first token; templates that do not read the flag ignore it.
+    """
+    chat = [{"role": "user", "content": user_content}]
+    ids = tokenizer.apply_chat_template(
+        chat, tokenize=True, add_generation_prompt=True, enable_thinking=False,
+    )
+    if hasattr(ids, "input_ids"):
+        ids = ids["input_ids"]
+    if ids and isinstance(ids[0], list):  # some backends return a batch of one
+        ids = ids[0]
+    return [int(i) for i in ids]
+
 
 def load_target_locs(metadata_csv):
     """(category, example_id) -> target_loc (int) or None for NA rows."""
@@ -241,6 +268,7 @@ def cmd_prepare(config, run_dir):
             n_lines = sum(1 for line in f if line.strip())
         complete = (header.get("prompt_hash") == PROMPT_HASH
                     and header.get("n_prompts") == len(instances)
+                    and header.get("schema") == REQUEST_SCHEMA
                     and n_lines == len(instances)
                     and (run_dir / "meta.json").exists())
         if complete:
@@ -252,8 +280,13 @@ def cmd_prepare(config, run_dir):
                 f"{requests_path} exists but does not match the current config/template "
                 f"(delete the run directory {run_dir} to regenerate)"
             )
-        print(f"[prepare] {requests_path} is incomplete ({n_lines}/{len(instances)} "
-              f"prompts); rewriting")
+        if header.get("schema") != REQUEST_SCHEMA:
+            print(f"[prepare] {requests_path} uses request schema "
+                  f"{header.get('schema', 1)}; rewriting as schema {REQUEST_SCHEMA} "
+                  f"(pre-tokenized). Existing responses.jsonl stays valid.")
+        else:
+            print(f"[prepare] {requests_path} is incomplete ({n_lines}/{len(instances)} "
+                  f"prompts); rewriting")
 
     run_dir.mkdir(parents=True, exist_ok=True)
     with open(run_dir / "instances.jsonl", "w", encoding="utf-8") as f:
@@ -263,6 +296,7 @@ def cmd_prepare(config, run_dir):
 
     header = {
         "type": "header",
+        "schema": REQUEST_SCHEMA,
         "model": model,
         "label_token_ids": label_info["label_token_ids"],
         "option_letters": label_info["option_letters"],
@@ -270,28 +304,38 @@ def cmd_prepare(config, run_dir):
         "run_id": run_dir.name,
         "n_prompts": len(instances),
     }
+    token_lengths = []
     with open(requests_path, "w", encoding="utf-8") as f:
         f.write(json.dumps(header, ensure_ascii=False) + "\n")
         for instance in instances:
-            chat = [{"role": "user", "content": instance["prompt_user_content"]}]
-            # enable_thinking=False: reasoning models (Qwen3.5 and friends) would
-            # otherwise open with a think block, so the assistant's first token is
-            # not the answer letter and first-token scoring collapses. Templates
-            # that do not read the flag ignore it -- verified byte-identical on
-            # Qwen2.5, so this does not disturb the existing runs.
-            prompt = tokenizer.apply_chat_template(
-                chat, tokenize=False, add_generation_prompt=True,
-                enable_thinking=False,
-            )
-            f.write(json.dumps({"index": instance["index"], "prompt": prompt},
-                               ensure_ascii=False) + "\n")
+            token_ids = encode_chat_prompt(tokenizer, instance["prompt_user_content"])
+            token_lengths.append(len(token_ids))
+            f.write(json.dumps({"index": instance["index"],
+                                "prompt_token_ids": token_ids}) + "\n")
+    print(f"[prepare] prompt length: min={min(token_lengths)} "
+          f"max={max(token_lengths)} tokens "
+          f"(--max-model-len must exceed the max)")
+
+    # requests.jsonl is token ids now, so keep one decoded prompt here: it is the
+    # only human-readable record of what the model was actually shown (chat
+    # template, default system prompt or not, BOS handling).
+    try:
+        sample_prompt = tokenizer.decode(
+            encode_chat_prompt(tokenizer, instances[0]["prompt_user_content"]),
+            skip_special_tokens=False,
+        )
+    except Exception as exc:
+        sample_prompt = f"<could not decode: {exc}>"
 
     meta = {
         "run_id": run_dir.name,
         "model": model,
         "model_revision": revision_sha,
         "dtype": config["dtype"],
+        "tokenizer_backend": type(tokenizer).__name__,
         "prompt_hash": PROMPT_HASH,
+        "prompt_token_len": {"min": min(token_lengths), "max": max(token_lengths)},
+        "sample_prompt": sample_prompt,
         "option_letters": label_info["option_letters"],
         "label_token_ids": label_info["label_token_ids"],
         "label_token_variant": label_info["variant"],

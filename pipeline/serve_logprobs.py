@@ -3,8 +3,9 @@
 
 Pure function over JSONL: knows nothing about BBQ. Reads a requests file whose
 first line is a header ({"type": "header", "model": ..., "label_token_ids":
-{"A": id, "B": id, "C": id}}) followed by {"index": int, "prompt": str} lines
-(prompts are already chat-templated by the local side), and appends
+{"A": id, "B": id, "C": id}}) followed by {"index": int, "prompt_token_ids":
+[int]} lines (chat template already applied by the local side; older schema-1
+files carry {"prompt": str} instead and are re-encoded here), and appends
 {"index": int, "logprobs": {"A": float|null, "B": ..., "C": ...}} lines to the
 output file. Logprobs are log-softmax over the full vocab at the assistant's
 first token position, so the local side can compute prob_mass_captured exactly.
@@ -135,10 +136,16 @@ def main():
     with open(args.output, "a", encoding="utf-8") as out:
         for start in range(0, len(todo), args.batch_size):
             batch = todo[start:start + args.batch_size]
-            # Prompts already contain the chat template (incl. BOS text), so
-            # tokenize without special tokens to avoid a double BOS.
+            # Schema 2 requests are already token ids -- hand them to vLLM as-is.
+            # Schema 1 (older runs) carries chat-templated text instead; it was
+            # produced with tokenize=False, so encode without special tokens to
+            # avoid a double BOS. Do not use that path for tokenizers whose
+            # template is not a jinja string (Mistral): re-encoding the rendered
+            # text turns [INST] & friends into literal characters.
             prompts = [
-                {"prompt_token_ids": tokenizer.encode(it["prompt"], add_special_tokens=False)}
+                {"prompt_token_ids": it["prompt_token_ids"]} if "prompt_token_ids" in it
+                else {"prompt_token_ids": tokenizer.encode(it["prompt"],
+                                                           add_special_tokens=False)}
                 for it in batch
             ]
             outputs = llm.generate(prompts, sampling)

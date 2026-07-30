@@ -9,6 +9,7 @@ lab server; it just turns prompts into A/B/C logprobs with vLLM).
 | file | where | role |
 |---|---|---|
 | `config.json` | local | model / dtype / revision / category & question_index selection |
+| `requests.jsonl` | → server | `{"index", "prompt_token_ids"}` per line (schema 2). The chat template is applied **once**, in `prepare`; the server never re-tokenizes. Schema-1 files (`{"prompt": <text>}`) from earlier runs are still accepted. |
 | `pipeline.py` | local | `prepare` (build prompts) / `collect` (join logprobs → records) |
 | `tokenizer_checker.py` | local | picks `"A"` vs `" A"` label-token variant (single-token check) |
 | `serve_logprobs.py` | **lab server** | pure JSONL→JSONL vLLM logprob function, resume-safe |
@@ -40,9 +41,17 @@ but vLLM profiles the vision tower at startup with a dummy image worth a few tho
 tokens, which blows past a small `--max-model-len`. Pass `--limit-images 0`
 (`LIMIT_IMAGES=0` for `run_ladder.sh`) to switch the image path off; nothing in BBQ uses it.
 
-Note also that Mistral's chat template injects a ~530-token default system prompt when the
-conversation has no system message, so templated BBQ prompts land at ~620–740 tokens
-instead of ~100. `MAX_MODEL_LEN=1024` still fits.
+Mistral checkpoints additionally ship two tokenizers, and which one `AutoTokenizer`
+returns depends on whether `mistral_common` is installed:
+
+| backend | picked when | prompt |
+|---|---|---|
+| `MistralCommonBackend` | `mistral_common` installed (vLLM pulls it in) | `<s>[INST]…[/INST]`, no system prompt, ~110–170 tokens |
+| `TokenizersBackend` | otherwise — renders `chat_template.jinja` | injects a ~530-token default "Le Chat" system prompt |
+
+`prepare` records which one it used in `meta.json` (`tokenizer_backend`, `sample_prompt`),
+so always run `prepare` in the same environment as `serve_logprobs.py`. The mistral-common
+backend is the reference tokenizer and the one you get on a vLLM server.
 
 ## config.json
 
