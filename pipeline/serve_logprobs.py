@@ -83,6 +83,13 @@ def main():
     parser.add_argument("--max-tokens", type=int, default=1,
                         help="1 = first-token logprobs only; >1 also decodes greedily "
                              "and emits the generated text (free-generation arm)")
+    parser.add_argument("--limit-images", type=int, default=None,
+                        help="limit_mm_per_prompt['image'] for vision-capable models "
+                             "(Ministral-3, Mistral-Small-3.x, Qwen2.5-VL...). Pass 0 to "
+                             "disable the image path: the prompts here are text-only, and "
+                             "vLLM otherwise profiles with a dummy image worth thousands of "
+                             "tokens, which does not fit a small --max-model-len. Omitted "
+                             "= vLLM's default (text-only models ignore this).")
     args = parser.parse_args()
 
     header, items = read_requests(args.input)
@@ -100,6 +107,8 @@ def main():
     llm_kwargs = {}
     if args.max_num_seqs is not None:
         llm_kwargs["max_num_seqs"] = args.max_num_seqs
+    if args.limit_images is not None:
+        llm_kwargs["limit_mm_per_prompt"] = {"image": args.limit_images}
 
     llm = LLM(
         model=model,

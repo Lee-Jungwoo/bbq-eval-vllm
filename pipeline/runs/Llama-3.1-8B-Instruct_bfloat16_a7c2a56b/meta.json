@@ -1,0 +1,31 @@
+{
+  "run_id": "Llama-3.1-8B-Instruct_bfloat16_a7c2a56b",
+  "model": "meta-llama/Llama-3.1-8B-Instruct",
+  "model_revision": "0e9e39f249a16976918f6564b8830bc894c89659",
+  "dtype": "bfloat16",
+  "prompt_hash": "76ae9033f0f484f5",
+  "option_letters": [
+    "A",
+    "B",
+    "C"
+  ],
+  "label_token_ids": {
+    "A": 32,
+    "B": 33,
+    "C": 34
+  },
+  "label_token_variant": "plain",
+  "categories": [
+    "Age",
+    "Disability_status",
+    "Gender_identity",
+    "Nationality",
+    "Physical_appearance",
+    "Race_ethnicity",
+    "Religion",
+    "SES",
+    "Sexual_orientation"
+  ],
+  "max_question_index": "all",
+  "n_instances": 31372
+}

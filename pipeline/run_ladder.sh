@@ -12,6 +12,8 @@
 #   ./run_ladder.sh Qwen/Qwen2.5-3B-Instruct meta-llama/Llama-3.1-8B-Instruct
 #   GPU=0 BATCH_SIZE=256 ./run_ladder.sh   # env overrides
 #   GPU=0,1 ./run_ladder.sh Qwen/Qwen2.5-14B-Instruct   # shard over two GPUs
+#   LIMIT_IMAGES=0 ./run_ladder.sh mistralai/Ministral-3-3B-Instruct-2512-BF16
+#                                          # vision-capable models: see LIMIT_IMAGES below
 #
 # Long runs: launch under tmux, or
 #   nohup ./run_ladder.sh > ladder.out 2>&1 &
@@ -34,6 +36,11 @@ GPU_MEM_UTIL="${GPU_MEM_UTIL:-0.90}"
 # allocates a vocab-wide logits row per sequence, which is what OOMs on a big
 # model long before the KV cache does -- BATCH_SIZE does not affect it.
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-}"
+# Vision-capable models (Ministral-3, Mistral-Small-3.x, ...) profile with a
+# dummy image of a few thousand tokens at startup, which does not fit
+# MAX_MODEL_LEN=1024. LIMIT_IMAGES=0 turns the image path off -- BBQ prompts are
+# text-only, so nothing is lost. Empty = vLLM default (text-only models).
+LIMIT_IMAGES="${LIMIT_IMAGES:-}"
 CONFIG="${CONFIG:-$PIPELINE_DIR/config.json}"
 
 MODELS=("$@")
@@ -122,6 +129,7 @@ PY
             --tensor-parallel-size "$TP" \
             --gpu-memory-utilization "$GPU_MEM_UTIL" \
             ${MAX_NUM_SEQS:+--max-num-seqs $MAX_NUM_SEQS} \
+            ${LIMIT_IMAGES:+--limit-images $LIMIT_IMAGES} \
             2>&1 | tee "$LOG_DIR/$short.2_serve.log"; then
         FAILED+=("$model (serve_logprobs)")
         continue

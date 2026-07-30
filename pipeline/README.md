@@ -33,6 +33,17 @@ python pipeline.py collect                  # → runs/<run_id>/records.jsonl
 python aggregate.py runs/<run_id>/records.jsonl
 ```
 
+## Vision-capable models
+
+Text-only prompts run fine on multimodal checkpoints (Ministral-3, Mistral-Small-3.x, …),
+but vLLM profiles the vision tower at startup with a dummy image worth a few thousand
+tokens, which blows past a small `--max-model-len`. Pass `--limit-images 0`
+(`LIMIT_IMAGES=0` for `run_ladder.sh`) to switch the image path off; nothing in BBQ uses it.
+
+Note also that Mistral's chat template injects a ~530-token default system prompt when the
+conversation has no system message, so templated BBQ prompts land at ~620–740 tokens
+instead of ~100. `MAX_MODEL_LEN=1024` still fits.
+
 ## config.json
 
 ```jsonc
