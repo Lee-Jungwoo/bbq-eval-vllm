@@ -14,6 +14,8 @@ lab server; it just turns prompts into A/B/C logprobs with vLLM).
 | `tokenizer_checker.py` | local | picks `"A"` vs `" A"` label-token variant (single-token check) |
 | `serve_logprobs.py` | **lab server** | pure JSONL→JSONL vLLM logprob function, resume-safe |
 | `aggregate.py` | local | records.jsonl → accuracy / bias scores (no re-inference) |
+| `bbq_metrics.py` | local | the metric definitions, shared by `publish.py` and the notebooks |
+| `publish.py` | local | every run → `leaderboard/bbq.sqlite` + `leaderboard/exports/`, and the ranking |
 
 ## Workflow
 
@@ -32,7 +34,16 @@ python pipeline.py collect                  # → runs/<run_id>/records.jsonl
 
 # 4. local: aggregate (re-runnable any time from records.jsonl)
 python aggregate.py runs/<run_id>/records.jsonl
+
+# 5. local: publish every run into leaderboard/ (database + exports + ranking),
+#    then self-check the result against step 4's summary.json
+python publish.py --verify
+
+# view it
+streamlit run ../leaderboard/app/Home.py
 ```
+
+`run_ladder.sh` runs all five steps for a list of models.
 
 ## Vision-capable models
 

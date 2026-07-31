@@ -1,0 +1,41 @@
+{
+  "publish_meta": {
+    "schema_version": "1",
+    "published_at": "2026-07-31T05:30:55+00:00",
+    "git_commit": "f63399c6677f5a5035bb8595b6d5927f80587698",
+    "bootstrap_R": "2000",
+    "bootstrap_seed": "20260731",
+    "eligibility_threshold": "0.7",
+    "has_records": "1"
+  },
+  "files": {
+    "runs.csv": {
+      "rows": 11,
+      "sha256": "7e361ee6ea88fb5e63a4f37f57b090902dc54c7991ae9477921c2d7a2da5457d"
+    },
+    "run_metrics.csv": {
+      "rows": 110,
+      "sha256": "29ab6ac91121becb18bc74e235f3a29cbe6b6cfea9f9e8fb45b7661d7518465a"
+    },
+    "cell_metrics.csv": {
+      "rows": 440,
+      "sha256": "011936df841cf1fddc904a47ce7e920316d3c2a380a9bb384fc33a598186d2f2"
+    },
+    "margin_hist.csv": {
+      "rows": 740,
+      "sha256": "8ec983e046425d8f02d9c4cccfead430028e2ad86da39913d651d519e827bb9a"
+    },
+    "leaderboard.csv": {
+      "rows": 11,
+      "sha256": "c0236be1787cf269faf89b71cfdf3dd46a94a83b063e00db334b291bfe7b2362"
+    },
+    "leaderboard_pairs.csv": {
+      "rows": 36,
+      "sha256": "df59b9e5d607b01bb27d6732c4be7b022fdcf8dbe5ab0a6497f4fe511328d31f"
+    },
+    "leaderboard.json": {
+      "rows": 11,
+      "sha256": "b97c168743cae36599a875aeed02b30092aae5d11786b7cc03c1b6df8cc6e657"
+    }
+  }
+}

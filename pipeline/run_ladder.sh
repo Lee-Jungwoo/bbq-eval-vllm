@@ -158,6 +158,10 @@ echo "================================ ladder summary ==========================
 if [ ${#RECORDS[@]} -gt 0 ]; then
     python aggregate.py "${RECORDS[@]}" --out "$LOG_DIR/ladder_summary.json" \
         2>&1 | tee "$LOG_DIR/ladder_summary.log"
+
+    # Step 5: republish every run into leaderboard/ and self-check the result
+    # against the summary.json files aggregate.py just wrote.
+    python publish.py --verify 2>&1 | tee "$LOG_DIR/publish.log"
 fi
 if [ ${#FAILED[@]} -gt 0 ]; then
     echo

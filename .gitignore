@@ -20,3 +20,10 @@ pipeline/runs/**
 
 # python notebooks
 *.ipynb
+# leaderboard: the SQLite database is a build artifact of pipeline/publish.py and
+# is regenerable from pipeline/runs/. The CSV/JSON exports under
+# leaderboard/exports/ are small and ARE committed — they are what makes the
+# published numbers reviewable without the 160MB database.
+leaderboard/*.sqlite
+leaderboard/*.sqlite-wal
+leaderboard/*.sqlite-shm

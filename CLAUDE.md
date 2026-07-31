@@ -39,7 +39,33 @@ python generate_from_template_intersectional_cats.py
 
 Generation is **stochastic** (`random.sample`/`shuffle`/`choice` with no seed) — rerunning changes exact items and ordering. Don't expect byte-identical `data/` output across runs.
 
-`pipeline.ipynb` is the user's working notebook (loads each `data/*.jsonl` with `pd.read_json(..., lines=True)` and explores structure). `pipeline.py` is currently empty — likely the intended script form of that notebook.
+## The evaluation pipeline (`pipeline/`)
+
+Separate from generation. Splits BBQ evaluation into a local side (prompt building, scoring, aggregation) and a server side (`serve_logprobs.py`, the only file copied to the lab GPU server). Five steps:
+
+```bash
+cd pipeline
+python pipeline.py prepare        # data/*.jsonl + templates → runs/<run_id>/{requests,instances}.jsonl, meta.json
+# … scp requests.jsonl to the server, run serve_logprobs.py, scp responses.jsonl back …
+python pipeline.py collect        # → runs/<run_id>/records.jsonl (one row per instance)
+python aggregate.py runs/<run_id>/records.jsonl --out runs/<run_id>/summary.json
+python publish.py --verify        # all runs → ../leaderboard/{bbq.sqlite,exports/} + the ranking
+streamlit run ../leaderboard/app/Home.py
+```
+
+`run_ladder.sh` drives all five for a list of models. See `pipeline/README.md`.
+
+- `pipeline/bbq_metrics.py` is the **single source of truth for every metric** — `summarize`, `answered_stats`, `polarity_stats`, `wilson`, the margin stats, the palette, and the bootstrap. `publish.py` and the analysis notebooks both import it. Do not restate a metric anywhere else.
+- `pipeline/aggregate.py` is deliberately left alone: it is the oracle that `publish.py --verify` checks against (1,441 exact comparisons). Changing it destroys the check.
+- The three `pipeline*.ipynb` notebooks (Qwen2.5 / Llama / Ministral) are exploratory and still hold their own copies of those functions; `leaderboard/app/pages/2_Scaling_curves.py` reproduces their headline figures from the database.
+
+**Metric gotcha that matters more than any other:** `is_biased` / `is_target` are tri-state — `None` for an unknown prediction and for the ~16 examples with no `target_loc`, never `False`. `fillna(0)` on either counts every abstention as an anti-stereotype pick and drags every bias score downward.
+
+**Interpretation gotcha:** `s_AMB = (1 - accuracy_ambig) * s_AMB_unscaled`, and in an ambiguous context the correct answer *is* "unknown" — so `accuracy_ambig` is essentially the abstention rate and `s_AMB` collapses toward zero for a model that simply declines to answer. Always read `s_AMB_unscaled` / `s_answered` / `n_elig_ambig` alongside it. See `leaderboard/README.md`.
+
+## Leaderboard (`leaderboard/`)
+
+`bbq.sqlite` (gitignored, regenerable) + committed CSV/JSON exports + a Streamlit app. Ranking is `B(m) = |s_DIS| + |s_AMB|` ascending among models passing `accuracy_disambig >= 0.7`, within a comparability group, with a paired cluster-bootstrap CI on B.
 
 ## Data schema (`data/*.jsonl`, one JSON object per line)
 
@@ -56,3 +82,5 @@ Generation is **stochastic** (`random.sample`/`shuffle`/`choice` with no seed) �
 - `results/` — published model outputs (UnifiedQA jsonl per category; RoBERTa/DeBERTaV3 csv of logits).
 - `analysis_scripts/` — R scoring + metadata.
 - `supplemental/` — MTurk validation HITs/scripts/results, name & occupation-prestige source data, `additional_metadata.csv`.
+- `pipeline/` — the evaluation pipeline (above). `pipeline/runs/<run_id>/` holds per-run artifacts; only `meta.json` and `summary.json` are version-controlled.
+- `leaderboard/` — published database, committed exports, and the Streamlit app.
