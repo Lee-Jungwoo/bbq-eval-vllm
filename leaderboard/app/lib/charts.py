@@ -53,8 +53,8 @@ def bias_dotplot(frame: pd.DataFrame) -> go.Figure:
         ))
     fig.add_vline(x=0, line=dict(color=t.AXIS, width=1, dash="dash"))
     return t.apply(fig, height=80 + 34 * len(ordered),
-                   title="B(m) with a 95% cluster-bootstrap CI",
-                   xaxis_title="B(m)  — lower is less biased",
+                   title="모델별 Bias (95% cluster-bootstrap CI)",
+                   xaxis_title="<- 편향이 작음                        편향이 큼 ->",
                    yaxis_title=None,
                    yaxis=dict(showgrid=False, categoryorder="array",
                               categoryarray=category_order))
@@ -248,3 +248,71 @@ def scaling_curve(frame: pd.DataFrame, columns: tuple[str, ...],
                    xaxis=dict(type="log", tickmode="array",
                               tickvals=frame["params_b"].tolist(),
                               ticktext=[f"{v:g}B" for v in frame["params_b"]]))
+
+
+def scaling_response_composition(frame: pd.DataFrame, condition: str) -> go.Figure:
+    """Response mix by parameter count for one BBQ context condition."""
+    counts = {
+        "ambiguous": ("n_ambig", "n_unknown_ambig", "n_elig_ambig",
+                      "n_biased_ambig", "ambiguous"),
+        "disambiguated": ("n_disambig", "n_unknown_disambig", "n_elig_disambig",
+                            "n_biased_disambig", "disambiguated"),
+    }
+    try:
+        total_col, unknown_col, eligible_col, biased_col, label = counts[condition]
+    except KeyError as exc:
+        raise ValueError(f"Unknown context condition: {condition}") from exc
+
+    total = frame[total_col].to_numpy()
+    response_counts = (
+        (unknown_col, "unknown", t.UNKNOWN),
+        (None, "anti-biased", t.COUNTER),
+        (biased_col, "biased", t.BIASED),
+    )
+    parameter_labels = [f"{value:g}B" for value in frame["params_b"]]
+    fig = go.Figure()
+    for column, series_label, colour in response_counts:
+        values = (frame[eligible_col] - frame[biased_col]).to_numpy() if column is None \
+            else frame[column].to_numpy()
+        share = values / np.where(total > 0, total, np.nan)
+        fig.add_trace(go.Bar(
+            x=parameter_labels, y=share, name=series_label,
+            marker=dict(color=colour, line=dict(color=t.SURFACE, width=1)),
+            customdata=values,
+            hovertemplate=(f"<b>{series_label}</b><br>{series_label}: %{{y:.1%}} "
+                           "(%{customdata:,} items)<br>%{x} parameters<extra></extra>"),
+        ))
+    return t.apply(fig, height=380,
+                   title=f"{label.capitalize()} responses by parameter scale",
+                   barmode="stack", bargap=0.22,
+                   xaxis_title="parameters (B)", yaxis_title="share of items",
+                   xaxis=dict(type="category", categoryorder="array",
+                              categoryarray=parameter_labels),
+                   yaxis=dict(range=[0, 1], tickformat=".0%"))
+
+
+def scaling_ambiguous_non_unknown(frame: pd.DataFrame) -> go.Figure:
+    """Biased and anti-biased mix among ambiguous non-unknown responses."""
+    total = frame["n_elig_ambig"].to_numpy()
+    response_counts = (
+        (frame["n_elig_ambig"] - frame["n_biased_ambig"], "anti-biased", t.COUNTER),
+        (frame["n_biased_ambig"], "biased", t.BIASED),
+    )
+    parameter_labels = [f"{value:g}B" for value in frame["params_b"]]
+    fig = go.Figure()
+    for counts, label, colour in response_counts:
+        share = counts.to_numpy() / np.where(total > 0, total, np.nan)
+        fig.add_trace(go.Bar(
+            x=parameter_labels, y=share, name=label,
+            marker=dict(color=colour, line=dict(color=t.SURFACE, width=1)),
+            customdata=counts,
+            hovertemplate=(f"<b>{label}</b><br>{label}: %{{y:.1%}} "
+                           "(%{customdata:,} items)<br>%{x} parameters<extra></extra>"),
+        ))
+    return t.apply(fig, height=280,
+                   title="Biased vs anti-biased ambiguous responses",
+                   barmode="stack", bargap=0.22,
+                   xaxis_title="parameters (B)", yaxis_title="share of non-unknown responses",
+                   xaxis=dict(type="category", categoryorder="array",
+                              categoryarray=parameter_labels),
+                   yaxis=dict(range=[0, 1], tickformat=".0%"))

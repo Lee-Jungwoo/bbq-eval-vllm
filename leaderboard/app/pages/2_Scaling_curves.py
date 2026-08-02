@@ -51,18 +51,16 @@ with right:
         "Bias score", "bias score",
         hline=0.0, hline_label="unbiased"), width="stretch")
 
-st.plotly_chart(charts.scaling_curve(
-    frame, ("s_AMB", "s_answered", "unknown_rate_ambig"),
-    ("s_AMB (scaled)", "s_answered (unscaled)", "abstention rate"),
-    (t.AMBIG, t.BIASED, t.UNKNOWN),
-    "Why s_AMB falls with scale", "value"), width="stretch")
+left, right = st.columns(2)
+with left:
+    st.plotly_chart(charts.scaling_response_composition(frame, "ambiguous"),
+                    width="stretch")
+    st.plotly_chart(charts.scaling_ambiguous_non_unknown(frame), width="stretch")
+with right:
+    st.plotly_chart(charts.scaling_response_composition(frame, "disambiguated"),
+                    width="stretch")
 
-st.info(
-    "The two lines pull in opposite directions. `s_AMB` carries a "
-    "`(1 − accuracy_ambig)` factor, and `accuracy_ambig` on ambiguous items is "
-    "essentially the abstention rate — so as a family scales up and abstains more, "
-    "`s_AMB` is damped toward zero even while `s_answered`, the direction the model "
-    "leans when it *does* name a group, rises.")
+
 
 st.dataframe(
     frame[["model_short", "params_b", "accuracy_ambig", "accuracy_disambig",

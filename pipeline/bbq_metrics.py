@@ -438,6 +438,8 @@ def run_metrics_row(df: pd.DataFrame) -> dict:
 # ---------------------------------------------------------------------------
 #: (substring to match in the HF model name, family label to report)
 FAMILY_PATTERNS = (
+    ("Qwen3.5", "Qwen3.5"),
+    ("Qwen3", "Qwen3"),
     ("Qwen2.5", "Qwen2.5"),
     ("Ministral", "Ministral-3"),
     ("Mistral", "Mistral"),
