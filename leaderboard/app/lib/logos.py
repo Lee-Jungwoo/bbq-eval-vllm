@@ -16,13 +16,17 @@ ASSETS = Path(__file__).resolve().parents[1] / "assets" / "logos"
 #: HF org prefix (`model` column) → asset stem. The org is authoritative; the
 #: family name is only a fallback for rows without a qualified model id.
 _BY_ORG = {
+    "google": "google",
     "meta-llama": "meta",
     "mistralai": "mistral",
+    "openai": "openai",
     "qwen": "qwen",
 }
 
 #: Lower-cased substring of `family` → asset stem, tried in order.
 _BY_FAMILY = (
+    ("gemma", "google"),
+    ("gpt-oss", "openai"),
     ("llama", "meta"),
     ("ministral", "mistral"),
     ("mistral", "mistral"),
@@ -30,8 +34,10 @@ _BY_FAMILY = (
 )
 
 VENDOR_NAME = {
+    "google": "Google",
     "meta": "Meta",
     "mistral": "Mistral AI",
+    "openai": "OpenAI",
     "qwen": "Alibaba Qwen",
 }
 
