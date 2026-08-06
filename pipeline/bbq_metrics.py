@@ -445,21 +445,31 @@ FAMILY_PATTERNS = (
     ("Mistral", "Mistral"),
     ("Llama", "Llama"),
     ("gemma", "Gemma"),
+    ("gpt-oss", "GPT-OSS"),
     ("phi", "Phi"),
 )
+
+#: Digits followed by a B that ends the token: "-14B-Instruct", "-20b", "-E4B-it".
+#: The leading "-" skips the generation number ("Ministral-3-"), the trailing
+#: boundary skips the "-2512-BF16" style suffix, and the optional "E" picks up
+#: Gemma's E2B/E4B names. The B may be lower case ("gpt-oss-20b").
+_SIZE_RE = re.compile(r"-(E?)(\d+(?:\.\d+)?)[Bb](?![A-Za-z0-9])")
 
 
 def family_and_size(model: str) -> tuple[str, float | None]:
     """('mistralai/Ministral-3-14B-Instruct-2512-BF16') -> ('Ministral-3', 14.0).
 
-    The size regex requires a 'B' right after the digits, so the generation in
-    "Ministral-3-" and the "-2512-BF16" suffix are both skipped. The *last* match
-    wins for names where an earlier number could also qualify.
+    The *last* match wins for names where an earlier number could also qualify.
+
+    Gemma's "E2B"/"E4B" report *effective* parameters, not raw ones (E4B is an
+    ~8B checkpoint that activates ~4B). They are recorded here as the number the
+    name states, so a Gemma scaling curve mixes effective and raw sizes on one
+    axis — read those two points with that in mind.
     """
     short = model.split("/")[-1]
     family = next((label for needle, label in FAMILY_PATTERNS if needle in short), short)
-    matches = re.findall(r"-(\d+(?:\.\d+)?)B", short)
-    return family, float(matches[-1]) if matches else None
+    matches = _SIZE_RE.findall(short)
+    return family, float(matches[-1][1]) if matches else None
 
 
 def comparability_key(meta: Mapping) -> str:

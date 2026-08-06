@@ -69,6 +69,27 @@ PROMPT_HASH = hashlib.sha256(PROMPT_TEMPLATE.encode("utf-8")).hexdigest()[:16]
 
 LETTERS = ["A", "B", "C"]
 
+# Assistant-turn prefill, by model-name prefix. Scoring reads the first token
+# after the prompt, so the prompt has to end exactly where the answer letter
+# goes. Most chat templates already do: non-reasoning models start the turn with
+# the answer, and Qwen3 closes the reasoning block itself when it sees
+# enable_thinking=False (it emits an empty "<think>\n\n</think>\n\n"). gpt-oss
+# reads reasoning_effort instead, ignores the flag, and ends the turn at
+# "<|start|>assistant" — harmony then requires a channel header next, so A/B/C
+# fall outside the top-k logprobs and every response comes back null. Writing the
+# final-channel header ourselves is what Qwen3's template does for free.
+ASSISTANT_PREFILL = [
+    ("openai/gpt-oss", "<|channel|>final<|message|>"),
+]
+
+
+def assistant_prefill_for(model):
+    """The prefill string for this model, or None."""
+    for prefix, prefill in ASSISTANT_PREFILL:
+        if model.lower().startswith(prefix.lower()):
+            return prefill
+    return None
+
 # requests.jsonl schema. 1 = {"prompt": <chat-templated text>}, re-encoded by the
 # server. 2 = {"prompt_token_ids": [...]}, tokenized once here. Schema 1 is unsafe
 # for tokenizers whose chat template is not a jinja string: transformers' Mistral
@@ -152,13 +173,14 @@ def resolve_revision_sha(model, revision):
 
 # ---------------------------------------------------------------- data loading
 
-def encode_chat_prompt(tokenizer, user_content):
+def encode_chat_prompt(tokenizer, user_content, prefill=None):
     """Chat-template one user turn straight to token ids.
 
     tokenize=True on purpose: it is the only path that is correct for every
     tokenizer backend (see REQUEST_SCHEMA). enable_thinking=False keeps reasoning
     models from opening with a think block, which would push the answer letter off
-    the first token; templates that do not read the flag ignore it.
+    the first token; templates that do not read the flag ignore it, which is what
+    prefill (see ASSISTANT_PREFILL) is for.
     """
     chat = [{"role": "user", "content": user_content}]
     ids = tokenizer.apply_chat_template(
@@ -168,7 +190,10 @@ def encode_chat_prompt(tokenizer, user_content):
         ids = ids["input_ids"]
     if ids and isinstance(ids[0], list):  # some backends return a batch of one
         ids = ids[0]
-    return [int(i) for i in ids]
+    ids = [int(i) for i in ids]
+    if prefill:
+        ids += [int(i) for i in tokenizer.encode(prefill, add_special_tokens=False)]
+    return ids
 
 
 def load_target_locs(metadata_csv):
@@ -256,6 +281,18 @@ def cmd_prepare(config, run_dir):
           f"(option_letters={label_info['option_letters']}, "
           f"ids={label_info['label_token_ids']})")
 
+    prefill = assistant_prefill_for(model)
+    if prefill:
+        prefill_ids = tokenizer.encode(prefill, add_special_tokens=False)
+        if not prefill_ids or tokenizer.decode(prefill_ids) != prefill:
+            raise SystemExit(
+                f"[prepare] assistant prefill {prefill!r} does not round-trip through "
+                f"this tokenizer (got {prefill_ids} -> "
+                f"{tokenizer.decode(prefill_ids) if prefill_ids else ''!r}); "
+                f"fix ASSISTANT_PREFILL for {model}"
+            )
+        print(f"[prepare] assistant prefill: {prefill!r} (ids={prefill_ids})")
+
     revision_sha = resolve_revision_sha(model, config["revision"])
     target_locs = load_target_locs(REPO_ROOT / "analysis_scripts" / "additional_metadata.csv")
     instances = load_instances(config, categories, target_locs)
@@ -308,7 +345,8 @@ def cmd_prepare(config, run_dir):
     with open(requests_path, "w", encoding="utf-8") as f:
         f.write(json.dumps(header, ensure_ascii=False) + "\n")
         for instance in instances:
-            token_ids = encode_chat_prompt(tokenizer, instance["prompt_user_content"])
+            token_ids = encode_chat_prompt(tokenizer, instance["prompt_user_content"],
+                                           prefill=prefill)
             token_lengths.append(len(token_ids))
             f.write(json.dumps({"index": instance["index"],
                                 "prompt_token_ids": token_ids}) + "\n")
@@ -321,7 +359,8 @@ def cmd_prepare(config, run_dir):
     # template, default system prompt or not, BOS handling).
     try:
         sample_prompt = tokenizer.decode(
-            encode_chat_prompt(tokenizer, instances[0]["prompt_user_content"]),
+            encode_chat_prompt(tokenizer, instances[0]["prompt_user_content"],
+                               prefill=prefill),
             skip_special_tokens=False,
         )
     except Exception as exc:
@@ -339,6 +378,7 @@ def cmd_prepare(config, run_dir):
         "option_letters": label_info["option_letters"],
         "label_token_ids": label_info["label_token_ids"],
         "label_token_variant": label_info["variant"],
+        "assistant_prefill": prefill,
         "categories": categories,
         "max_question_index": config["max_question_index"],
         "n_instances": len(instances),

@@ -16,6 +16,13 @@ pipeline/runs/**
 !pipeline/runs/*/meta.json
 !pipeline/runs/*/summary.json
 
+# Per-ladder logs (pipeline/logs/ladder_<timestamp>/) and stray nohup output.
+# vLLM engine logs, tens of MB per ladder; the numbers they produced are already
+# captured in the run summaries and the leaderboard exports.
+pipeline/logs/
+nohup.out
+*.out
+
 
 
 # python notebooks

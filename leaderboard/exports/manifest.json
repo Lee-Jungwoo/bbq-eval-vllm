@@ -1,7 +1,7 @@
 {
   "publish_meta": {
     "schema_version": "1",
-    "published_at": "2026-07-31T15:56:46+00:00",
+    "published_at": "2026-08-06T04:06:13+00:00",
     "git_commit": "2e37df7bf101c3cce01356e9b85da04536d415d0",
     "bootstrap_R": "2000",
     "bootstrap_seed": "20260731",
@@ -11,31 +11,31 @@
   "files": {
     "runs.csv": {
       "rows": 20,
-      "sha256": "430f16d2d736eb73e45e295315045948d7d4d255991d7fbfb4fbeb192490bef5"
+      "sha256": "ce43f16ad70ce0c04a6e36f49c4673d594b49eace6cde390fa8d6754ece68077"
     },
     "run_metrics.csv": {
       "rows": 200,
-      "sha256": "16d5704c1d82ba23d564cd11766dc0bd242385bb84a9f4f13f5a12b825e25157"
+      "sha256": "a95450a9f4df78bbe31c814ece16afa54f46153357d70331f0be8202cd617978"
     },
     "cell_metrics.csv": {
       "rows": 800,
-      "sha256": "687e05c60ae94a06a06b9c23574f276c8dc827097f574f6f21f47e52762fadd4"
+      "sha256": "ab4aabc55745cde5fcbaa47cc3513d502b47f59bc35bf8c173d8fd1edada0b55"
     },
     "margin_hist.csv": {
-      "rows": 1471,
-      "sha256": "e5bca01663f064dc14b608b52d0cc01c30d13aac3d241c1cbf63369c8d7678b3"
+      "rows": 1578,
+      "sha256": "d167a02c16f5f56da997b6a6c1c4b507e6023dea64430b9d393c23ab6ea09b66"
     },
     "leaderboard.csv": {
       "rows": 20,
-      "sha256": "d001db64bcbe1e0423934519a74107904faa3a0afa7566fef9e0cde332e1f2cf"
+      "sha256": "d3e38efc635b256a24570cbd05f5f357e9ac6b114665c540d4422db7a335d659"
     },
     "leaderboard_pairs.csv": {
-      "rows": 120,
-      "sha256": "c69cc6e40d0c88f3f0d810bd991a7b37b139db05906d738f9152e79b1963a49b"
+      "rows": 136,
+      "sha256": "d273165b9844b8a679b355963713632a877147ca2e3db5f5dd8845cf35d5f632"
     },
     "leaderboard.json": {
       "rows": 20,
-      "sha256": "9ee4ba85ee6ab2a300364e09aaaa14dc0f48fc30d7f8def3d1f5f9118dc33cae"
+      "sha256": "c480913c5880b2f42e68e96f446aaaff320ce4ea6bb2b507440da6a7f3580bce"
     }
   }
 }
