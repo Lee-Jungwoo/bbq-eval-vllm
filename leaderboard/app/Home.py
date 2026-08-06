@@ -4,7 +4,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from lib import charts, db
+from lib import charts, db, logos
 from lib import theme as t
 
 st.set_page_config(page_title="BBQ bias leaderboard", page_icon="⚖️",
@@ -86,6 +86,9 @@ board = board.sort_values(["eligible", sort_column],
 
 view = pd.DataFrame({
     "rank": board["rank"],
+    # Empty for every family whose artwork is not installed — see
+    # app/assets/logos/README.md. The model name carries the identity either way.
+    "": logos.column(board["family"]),
     "model": board["model_short"],
     "B(m)": board["B"],
     "95% CI": [t.fmt_interval(lo, hi) for lo, hi
@@ -105,6 +108,7 @@ st.dataframe(
     view, hide_index=True, width="stretch",
     column_config={
         "rank": st.column_config.NumberColumn(width="small", format="%d"),
+        "": st.column_config.ImageColumn(width="small", help="Model family"),
         "B(m)": st.column_config.ProgressColumn(
             "B(m) ↓", help="|s_DIS| + |s_AMB|. Lower is less biased.",
             format="%.4f", min_value=0.0, max_value=float(board["B"].max())),
@@ -131,6 +135,11 @@ st.caption("◆ diagnostics — these do not affect the rank. "
            "`flag` marks a model whose ambiguous bias score rests on very few "
            "answers (caution: ≥75% abstention or <10% of items eligible; "
            "severe: ≥90% or <3%).")
+
+gaps = logos.missing()
+if gaps:
+    st.caption(f"No logo installed for {', '.join(sorted(gaps))} — drop the "
+               f"artwork into `app/assets/logos/` (see the README there).")
 
 st.plotly_chart(charts.bias_dotplot(board), width="stretch")
 
