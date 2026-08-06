@@ -1,8 +1,8 @@
 {
   "publish_meta": {
     "schema_version": "1",
-    "published_at": "2026-08-06T04:06:13+00:00",
-    "git_commit": "2e37df7bf101c3cce01356e9b85da04536d415d0",
+    "published_at": "2026-08-06T04:24:46+00:00",
+    "git_commit": "88cf265bee94a4731d5c526c63bdb76ebcad7d31",
     "bootstrap_R": "2000",
     "bootstrap_seed": "20260731",
     "eligibility_threshold": "0.7",
@@ -10,32 +10,32 @@
   },
   "files": {
     "runs.csv": {
-      "rows": 20,
-      "sha256": "ce43f16ad70ce0c04a6e36f49c4673d594b49eace6cde390fa8d6754ece68077"
+      "rows": 24,
+      "sha256": "47b5154ee7d57d2d7ea68f43ea47dfba56747896333d3148e09609c1da0ca6cd"
     },
     "run_metrics.csv": {
-      "rows": 200,
-      "sha256": "a95450a9f4df78bbe31c814ece16afa54f46153357d70331f0be8202cd617978"
+      "rows": 240,
+      "sha256": "66e8fa26674a11c22777f132e59175c8f22f0f3c8db2541520e2a47f19e875ea"
     },
     "cell_metrics.csv": {
-      "rows": 800,
-      "sha256": "ab4aabc55745cde5fcbaa47cc3513d502b47f59bc35bf8c173d8fd1edada0b55"
+      "rows": 960,
+      "sha256": "adf6e4ef4e12d7ac3a2a0ea23bc186d4c4be3ce71cb51b3caac96ae5cb20189d"
     },
     "margin_hist.csv": {
-      "rows": 1578,
-      "sha256": "d167a02c16f5f56da997b6a6c1c4b507e6023dea64430b9d393c23ab6ea09b66"
+      "rows": 1868,
+      "sha256": "db638b01ea2c4a7d87563d68cc7b962895d00c24d01586ed8e4546b7aabe1550"
     },
     "leaderboard.csv": {
-      "rows": 20,
-      "sha256": "d3e38efc635b256a24570cbd05f5f357e9ac6b114665c540d4422db7a335d659"
+      "rows": 24,
+      "sha256": "c21b706830ff31f80313c2fbfbee6e7c71a143d85e91845b9e2c4b525d959069"
     },
     "leaderboard_pairs.csv": {
-      "rows": 136,
-      "sha256": "d273165b9844b8a679b355963713632a877147ca2e3db5f5dd8845cf35d5f632"
+      "rows": 190,
+      "sha256": "60e466aca2f8fd1bc03681504900ccb699a66adea81371b937dfaba16cafa884"
     },
     "leaderboard.json": {
-      "rows": 20,
-      "sha256": "c480913c5880b2f42e68e96f446aaaff320ce4ea6bb2b507440da6a7f3580bce"
+      "rows": 24,
+      "sha256": "a2941a3d49a3d185aeb1897aa47950456ca562435ae6d694ae83db083da67743"
     }
   }
 }
