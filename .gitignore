@@ -7,19 +7,19 @@ __pycache__/
 # macOS
 .DS_Store
 
-# Per-run pipeline artifacts (pipeline/runs/<run_id>/).
+# Per-run pipeline artifacts (bbq_pipeline/runs/<run_id>/).
 # Everything in a run directory is bulk regenerable output — requests/instances/
 # responses/records.jsonl are ~56MB per run, and the free-generation arm adds more.
 # Only the small provenance files are kept in version control.
-pipeline/runs/**
-!pipeline/runs/*/
-!pipeline/runs/*/meta.json
-!pipeline/runs/*/summary.json
+bbq_pipeline/runs/**
+!bbq_pipeline/runs/*/
+!bbq_pipeline/runs/*/meta.json
+!bbq_pipeline/runs/*/summary.json
 
-# Per-ladder logs (pipeline/logs/ladder_<timestamp>/) and stray nohup output.
+# Per-ladder logs (bbq_pipeline/logs/ladder_<timestamp>/) and stray nohup output.
 # vLLM engine logs, tens of MB per ladder; the numbers they produced are already
 # captured in the run summaries and the leaderboard exports.
-pipeline/logs/
+bbq_pipeline/logs/
 nohup.out
 *.out
 
@@ -27,8 +27,8 @@ nohup.out
 
 # python notebooks
 *.ipynb
-# leaderboard: the SQLite database is a build artifact of pipeline/publish.py and
-# is regenerable from pipeline/runs/. The CSV/JSON exports under
+# leaderboard: the SQLite database is a build artifact of bbq_pipeline/publish.py and
+# is regenerable from bbq_pipeline/runs/. The CSV/JSON exports under
 # leaderboard/exports/ are small and ARE committed — they are what makes the
 # published numbers reviewable without the 160MB database.
 leaderboard/*.sqlite

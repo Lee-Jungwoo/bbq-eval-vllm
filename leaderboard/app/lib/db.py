@@ -1,6 +1,6 @@
 """Read-only access to `leaderboard/bbq.sqlite`, cached for Streamlit.
 
-The database is a build artifact of `pipeline/publish.py` and is never written
+The database is a build artifact of `bbq_pipeline/publish.py` and is never written
 here. Every query is cached against the file's mtime, so a republish while the
 app is running invalidates the cache instead of serving stale rows.
 """
@@ -41,7 +41,7 @@ def require_db() -> None:
     st.markdown(
         "`leaderboard/bbq.sqlite` is a build artifact and is not committed. "
         "Build it from the run directories:")
-    st.code("python pipeline/publish.py --verify", language="bash")
+    st.code("python bbq_pipeline/publish.py --verify", language="bash")
     st.stop()
 
 

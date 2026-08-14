@@ -14,12 +14,12 @@ leaderboard/
 ## Build and view
 
 ```bash
-python pipeline/publish.py --verify        # rebuild the database and exports
+python bbq_pipeline/publish.py --verify        # rebuild the database and exports
 streamlit run leaderboard/app/Home.py      # http://localhost:8501
 ```
 
 `bbq.sqlite` is a build artifact and is **not** committed — it is fully
-regenerable from `pipeline/runs/`. `exports/` is committed so the published
+regenerable from `bbq_pipeline/runs/`. `exports/` is committed so the published
 numbers stay reviewable in version control without the database.
 
 Install the UI dependencies once: `pip install -r leaderboard/requirements.txt`.
@@ -124,7 +124,7 @@ from the whole database, so a partial rebuild stays consistent).
 
 ## Colour
 
-The palette lives in `pipeline/bbq_metrics.py` and is shared with the notebooks.
+The palette lives in `bbq_pipeline/bbq_metrics.py` and is shared with the notebooks.
 The ambiguous/disambiguated, polarity, and correct/incorrect pairs pass the
 colourblind-separation and contrast checks. `UNKNOWN` (#5f6773) is a deliberate
 neutral — "the model named no group" is the absence of an identity, not a third

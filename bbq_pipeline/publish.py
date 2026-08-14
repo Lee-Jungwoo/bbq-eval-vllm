@@ -1015,7 +1015,7 @@ def git_commit() -> str | None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--runs-dir", default=str(REPO_ROOT / "pipeline" / "runs"))
+    parser.add_argument("--runs-dir", default=str(REPO_ROOT / "bbq_pipeline" / "runs"))
     parser.add_argument("--out", default=str(REPO_ROOT / "leaderboard"))
     parser.add_argument("--db", default=None, help="default: <out>/bbq.sqlite")
     parser.add_argument("--run-id", action="append", default=None,
