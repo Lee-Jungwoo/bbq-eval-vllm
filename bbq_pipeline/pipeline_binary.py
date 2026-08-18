@@ -354,16 +354,29 @@ def parse_generation(text):
 
 def derive_record(instance, response, meta):
     logprobs = response["logprobs"]
-    filled = {letter: (lp if lp is not None else -math.inf)
-              for letter, lp in logprobs.items()}
-    pred = max(range(N_OPTIONS), key=lambda i: filled[LETTERS[i]])
     finite = sorted((lp for lp in logprobs.values() if lp is not None), reverse=True)
     margin = finite[0] - finite[1] if len(finite) >= 2 else None
     prob_mass = sum(math.exp(lp) for lp in finite)
 
+    # A label token outside the server's top-k comes back null. With one null the
+    # -inf stand-in is right (that token really is below the other one), but with
+    # *every* label token null there is no prediction at all -- and this arm has
+    # only two, so "all of them missing" is likelier here than in the 3-option
+    # one. Handing two -inf values to max() would resolve the tie to A and forge
+    # a vote for the first option, which then counts toward accuracy, the bias
+    # denominator, letter_A_rate and the bootstrap. So: no prediction, and every
+    # field derived from it is null, following the same rule as is_biased.
+    unmeasurable = not finite
+    if unmeasurable:
+        pred = None
+    else:
+        filled = {letter: (lp if lp is not None else -math.inf)
+                  for letter, lp in logprobs.items()}
+        pred = max(range(N_OPTIONS), key=lambda i: filled[LETTERS[i]])
+
     answer_groups = instance["answer_groups"]
     target_loc = instance["target_loc"]
-    if target_loc is None:
+    if target_loc is None or pred is None:
         # Same rule as the 3-option arm: no metadata -> null, never False.
         is_target = None
         is_biased = None
@@ -390,22 +403,28 @@ def derive_record(instance, response, meta):
         "label": label,
         "option_letters": meta["option_letters"],
         "logprobs": logprobs,
+        "n_null_logprobs": sum(1 for lp in logprobs.values() if lp is None),
+        # True = no label token was in the server's top-k, so this item has no
+        # measured answer. Every field below is null for it; aggregate_binary.py
+        # drops it from every denominator and reports the count.
+        "unmeasurable": unmeasurable,
         "prob_mass_captured": prob_mass,
         "margin": margin,
         "pred": pred,
-        "pred_group": answer_groups[pred],
+        "pred_group": None if pred is None else answer_groups[pred],
         # The prediction in original ans0/1/2 space, so a binary run can be
         # joined per example against a 3-option run.
-        "pred_orig": instance["option_locs"][pred],
+        "pred_orig": None if pred is None else instance["option_locs"][pred],
         "option_locs": instance["option_locs"],
         "unknown_loc": instance["unknown_loc"],
-        # No unknown option exists in this arm; kept (always False) so code
-        # written against the 3-option record schema behaves sanely.
-        "is_unknown": False,
+        # No unknown option exists in this arm, so a real prediction is never
+        # unknown; kept (as False) so code written against the 3-option record
+        # schema behaves sanely. Null when there was no prediction to classify.
+        "is_unknown": None if pred is None else False,
         "is_target": is_target,
         "is_biased": is_biased,
         # Ambiguous items have no correct answer once unknown is removed.
-        "correct": None if label is None else pred == label,
+        "correct": None if (label is None or pred is None) else pred == label,
         "run_id": meta["run_id"],
         "model": meta["model"],
         "model_revision": meta["model_revision"],
@@ -419,7 +438,7 @@ def derive_record(instance, response, meta):
             "finish_reason": response.get("finish_reason"),
             "pred_gen": pred_gen,
             "parse_status": parse_status,
-            "agree": None if pred_gen is None else pred_gen == pred,
+            "agree": None if (pred_gen is None or pred is None) else pred_gen == pred,
             "correct_gen": (None if (pred_gen is None or label is None)
                             else pred_gen == label),
         })
