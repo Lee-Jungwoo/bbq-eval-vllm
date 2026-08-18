@@ -34,11 +34,41 @@ _BY_FAMILY = (
 )
 
 VENDOR_NAME = {
+    "ai2": "Ai2",
+    "anthropic": "Anthropic",
+    "cohere": "Cohere",
+    "databricks": "Databricks",
+    "deepseek": "DeepSeek",
     "google": "Google",
+    "ibm": "IBM",
     "meta": "Meta",
     "mistral": "Mistral AI",
+    "moonshot": "Moonshot AI",
     "openai": "OpenAI",
     "qwen": "Alibaba Qwen",
+    "xai": "xAI",
+    "zhipu": "Zhipu AI",
+}
+
+#: Publisher name (the external table's `vendor` column) → asset stem. Rows from
+#: `leaderboard/external/` carry a vendor rather than an HF org, and no run to
+#: infer a family from. Stems with no `.webp` in `assets/logos/` fall back to the
+#: blank placeholder, so adding the file is all it takes to light one up.
+_BY_VENDOR = {
+    "ai2": "ai2",
+    "alibaba": "qwen",
+    "anthropic": "anthropic",
+    "cohere": "cohere",
+    "databricks": "databricks",
+    "deepseek": "deepseek",
+    "google": "google",
+    "ibm": "ibm",
+    "meta": "meta",
+    "mistral": "mistral",
+    "moonshot": "moonshot",
+    "openai": "openai",
+    "xai": "xai",
+    "zhipu": "zhipu",
 }
 
 
@@ -70,3 +100,11 @@ def logo(model: str = "", family: str = "") -> tuple[str, str]:
     if not stem:
         return "", ""
     return data_uri(stem), VENDOR_NAME.get(stem, stem.title())
+
+
+def logo_for_vendor(name: str) -> tuple[str, str]:
+    """`(data-uri, vendor label)` from a publisher name. Both '' when unknown."""
+    stem = _BY_VENDOR.get(str(name).strip().lower(), "")
+    if not stem:
+        return "", ""
+    return data_uri(stem), VENDOR_NAME.get(stem, name)

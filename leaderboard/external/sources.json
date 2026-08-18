@@ -1,0 +1,92 @@
+{
+  "schema_version": "1",
+  "note": "Registry of externally-published BBQ results. Nothing here was measured by bbq_pipeline/. See README.md before comparing any of it against ../exports/.",
+  "sources": {
+    "helm_safety_v1.17.0": {
+      "publisher": "Stanford CRFM (HELM Safety)",
+      "url": "https://crfm.stanford.edu/helm/safety/latest/",
+      "data_url": "https://storage.googleapis.com/crfm-helm-public/safety/benchmark_output/releases/v1.17.0/groups/bbq.json",
+      "n_models": 87,
+      "setup": "0-shot, multiple_choice_joint (model generates a single letter A/B/C), temperature 0, max_tokens 1, 1000 instances sampled from all categories",
+      "reports": ["accuracy_overall", "s_AMB", "s_DIS"],
+      "s_DIS_status": "artifact",
+      "s_AMB_status": "degraded",
+      "caveat": "HELM's BBQ target-matching is broken; s_DIS is a near-constant sample artifact and s_AMB is systematically pulled toward zero. See README.md section 'HELM caveat'."
+    },
+    "anthropic_syscard": {
+      "publisher": "Anthropic (model / system cards)",
+      "n_models": 14,
+      "setup": "Vendor-internal. Standard (non-extended) thinking mode unless noted; Opus 4.8 card states thinking disabled and no system prompt.",
+      "reports": ["s_DIS", "s_AMB", "accuracy_disambig", "accuracy_ambig"],
+      "s_DIS_status": "ok",
+      "s_AMB_status": "ok",
+      "caveat": "Metric definitions match bbq_pipeline/bbq_metrics.py, but the prompt format, sampling and scoring path are unpublished. The Opus 4.8 card notes prior-model numbers shift between cards due to 'routine evaluation updates'.",
+      "cards": {
+        "Opus 4.8 SC (2026-05)": "https://www-cdn.anthropic.com/0b4915911bb0d19eca5b5ee635c80fef830a37ea.pdf",
+        "Opus 4.6 SC (2026-02)": "https://www-cdn.anthropic.com/0dd865075ad3132672ee0ab40b05a53f14cf5288.pdf",
+        "Opus 4.5 SC (2025-11)": "https://assets.anthropic.com/m/64823ba7485345a7/Claude-Opus-4-5-System-Card.pdf",
+        "Haiku 4.5 SC (2025-10)": "https://www-cdn.anthropic.com/7aad69bf12627d42234e01ee7c36305dc2f6a970.pdf",
+        "Opus 4.1 SC (2025-08)": "https://www-cdn.anthropic.com/9fa30625273bafdf5af82c93719d7ca606485a16/Claude%204.1%20System%20Card.pdf",
+        "Claude 4 SC (2025-05)": "https://www-cdn.anthropic.com/4263b940cabb546aa0e3283f35b686f4f3b2ff47/claude-opus-4-and-claude-sonnet-4-system-card.pdf",
+        "Claude 3 Model Card (2024-03)": "https://www-cdn.anthropic.com/de8ba9b01c9ab7cbabf5c33b80b7bbc618857627/Model_Card_Claude_3.pdf"
+      }
+    },
+    "openai_syscard_o1": {
+      "publisher": "OpenAI (o1 System Card, 2024-12-05)",
+      "url": "https://cdn.openai.com/o1-system-card-20241205.pdf",
+      "table": "Table 4",
+      "reports": ["accuracy_disambig", "accuracy_ambig", "p_not_stereotype_ambig"],
+      "s_DIS_status": "unavailable",
+      "s_AMB_status": "unavailable"
+    },
+    "openai_syscard_gpt45": {
+      "publisher": "OpenAI (GPT-4.5 System Card, 2025-02-27)",
+      "url": "https://cdn.openai.com/gpt-4-5-system-card-2272025.pdf",
+      "table": "Table 5",
+      "reports": ["accuracy_disambig", "accuracy_ambig", "p_not_stereotype_ambig"],
+      "s_DIS_status": "unavailable",
+      "s_AMB_status": "unavailable"
+    },
+    "openai_syscard_o3": {
+      "publisher": "OpenAI (o3 and o4-mini System Card, 2025-04-16)",
+      "url": "https://cdn.openai.com/pdf/2221c875-02dc-4789-800b-e7758f3722c1/o3-and-o4-mini-system-card.pdf",
+      "table": "Table 7",
+      "reports": ["accuracy_disambig", "accuracy_ambig", "p_not_stereotype_ambig"],
+      "s_DIS_status": "unavailable",
+      "s_AMB_status": "unavailable"
+    },
+    "openai_syscard_gpt5": {
+      "publisher": "OpenAI (GPT-5 System Card, 2025-08-13)",
+      "url": "https://cdn.openai.com/gpt-5-system-card.pdf",
+      "table": "Table 12",
+      "reports": ["accuracy_disambig", "accuracy_ambig"],
+      "s_DIS_status": "unavailable",
+      "s_AMB_status": "unavailable",
+      "caveat": "OpenAI changed the eval setup between cards: GPT-4o is 0.97/0.72 in the o1 card and 0.88/0.85 here. Never compare across OpenAI cards."
+    },
+    "google_gemma1": {
+      "publisher": "Google DeepMind (Gemma Technical Report)",
+      "url": "https://storage.googleapis.com/deepmind-media/gemma/gemma-report.pdf",
+      "table": "Table 8",
+      "setup": "1-shot, top-1",
+      "reports": ["accuracy_disambig", "accuracy_ambig"],
+      "s_DIS_status": "unavailable",
+      "s_AMB_status": "unavailable"
+    },
+    "google_gemma2": {
+      "publisher": "Google DeepMind (Gemma 2 Technical Report)",
+      "url": "https://storage.googleapis.com/deepmind-media/gemma/gemma-2-report.pdf",
+      "table": "Table 18",
+      "setup": "4-shot, top-1",
+      "reports": ["accuracy_disambig", "accuracy_ambig"],
+      "s_DIS_status": "unavailable",
+      "s_AMB_status": "unavailable"
+    }
+  },
+  "checked_and_absent": {
+    "google_gemma3": "Gemma 3 Technical Report (arXiv:2503.19786) dropped BBQ; it reports baseline policy-violation, CBRN, memorization and PII detection only.",
+    "meta_llama": "No official Meta model card reports BBQ. Third-party papers do, but with their own harnesses.",
+    "google_gemini": "No BBQ table in the Gemini technical reports; HELM measurements only.",
+    "bigbench_bbq_lite_json": "Raw per-model score JSON exists at github.com/google/BIG-bench/tree/main/bigbench/benchmark_tasks/bbq_lite_json/results, but only covers BIG-G / GPT-3 / PaLM (pre-2023) and scores multiple_choice_grade, not a bias score."
+  }
+}

@@ -18,24 +18,30 @@ from . import theme as t
 PODIUM = {1: ("#b8860b", "#fdf3d3"), 2: ("#5f6773", "#eceef0"), 3: ("#9a5b2c", "#f7e6d8")}
 
 #: The columns, in display order: header label, the frame column that label
-#: sorts on, whether that sort is ascending, its share of the table width, and
-#: the alignment class. The header row, the `<colgroup>` and the sidebar's
-#: "Sort by" list are all built from this, so they cannot drift apart.
-COLUMNS: tuple[tuple[str, str, bool, str, str], ...] = (
-    ("#",         "rank",               True,  "58px", ""),
-    ("Model",     "model_short",        True,  "28%",  ""),
-    ("Bias B(m)", "B",                  True,  "9%",   ""),
-    ("95% CI",    "B_lo",               True,  "13%",  ""),
-    ("s_DIS",     "s_DIS",              False, "19%",  ""),
-    ("s_AMB",     "s_AMB",              False, "19%",  ""),
-    ("acc_dis",   "accuracy_disambig",  False, "6%",   "right"),
-    ("acc_amb",   "accuracy_ambig",     False, "6%",   "right"),
+#: sorts on, whether that sort is ascending, its share of the table width, the
+#: alignment class, and the cell renderer. The header row, the `<colgroup>`, the
+#: body and the sidebar's "Sort by" list are all built from this, so they cannot
+#: drift apart.
+#:
+#: Cell renderers: ``rank`` podium badge · ``model`` logo + name + chips ·
+#: ``bias`` bold B(m) · ``ci`` the B_lo/B_hi interval · ``diverge`` signed bar
+#: centred at zero · ``acc`` plain 3dp · ``acc_gate`` 3dp, reddened below the
+#: eligibility threshold · ``num`` plain 3dp for anything else.
+COLUMNS: tuple[tuple[str, str, bool, str, str, str], ...] = (
+    ("#",         "rank",               True,  "58px", "",      "rank"),
+    ("Model",     "model_short",        True,  "28%",  "",      "model"),
+    ("Bias B(m)", "B",                  True,  "9%",   "",      "bias"),
+    ("95% CI",    "B_lo",               True,  "13%",  "",      "ci"),
+    ("s_DIS",     "s_DIS",              False, "19%",  "",      "diverge"),
+    ("s_AMB",     "s_AMB",              False, "19%",  "",      "diverge"),
+    ("acc_dis",   "accuracy_disambig",  False, "6%",   "right", "acc_gate"),
+    ("acc_amb",   "accuracy_ambig",     False, "6%",   "right", "acc"),
 )
 
 #: Header label → (frame column, ascending). `"#"` is the published rank, so it
 #: is the default and reproduces the official order.
 SORT_OPTIONS: dict[str, tuple[str, bool]] = {
-    label: (column, ascending) for label, column, ascending, _, _ in COLUMNS}
+    label: (column, ascending) for label, column, ascending, _, _, _ in COLUMNS}
 
 CSS = f"""
 <style>
@@ -152,7 +158,11 @@ def _diverge(value, vmax: float) -> str:
 
 
 def _model_cell(row) -> str:
-    uri, vendor_name = logos.logo(row.get("model", ""), row.get("family", ""))
+    # External rows carry a publisher name instead of an HF org and a family.
+    if row.get("vendor"):
+        uri, vendor_name = logos.logo_for_vendor(row["vendor"])
+    else:
+        uri, vendor_name = logos.logo(row.get("model", ""), row.get("family", ""))
     img = (f'<img class="logo" src="{uri}" alt="{html.escape(vendor_name)}" '
            f'title="{html.escape(vendor_name)}">' if uri
            else '<span class="logo blank"></span>')
@@ -160,6 +170,8 @@ def _model_cell(row) -> str:
     params = row.get("params_b")
     if params is not None and params == params:
         chips.append(f'<span class="chip">{float(params):g}B</span>')
+    if row.get("chip"):
+        chips.append(f'<span class="chip">{html.escape(str(row["chip"]))}</span>')
     if not row.get("eligible", 1):
         chips.append('<span class="chip gate" title="below the accuracy gate — '
                      'not ranked">gated</span>')
@@ -169,20 +181,63 @@ def _model_cell(row) -> str:
             f'{sub}</div></div>')
 
 
-def render(board: pd.DataFrame, *, threshold: float) -> str:
-    """The full `<style> + <table>` block for `st.html`."""
-    s_max = float(max(pd.to_numeric(board["s_DIS"], errors="coerce").abs().max() or 0,
-                      pd.to_numeric(board["s_AMB"], errors="coerce").abs().max() or 0))
+def _cell(kind: str, column: str, row: dict, *, align: str, s_max: float,
+          threshold: float, eligible: bool) -> str:
+    """One `<td>`, dispatched on the column's renderer."""
+    if kind == "rank":
+        rank = row.get(column)
+        if eligible and rank is not None and rank == rank:
+            rank = int(rank)
+            fg, bg = PODIUM.get(rank, ("", ""))
+            style = f' style="background:{bg};color:{fg}"' if fg else ""
+            return f'<td><span class="badge"{style}>{rank}</span></td>'
+        return '<td><span class="badge">—</span></td>'
+
+    if kind == "model":
+        return f"<td>{_model_cell(row)}</td>"
+
+    if kind == "bias":
+        return f'<td><span class="bias">{_fmt(row.get(column), ".4f")}</span></td>'
+
+    if kind == "ci":
+        return (f'<td class="ci">'
+                f'{t.fmt_interval(row.get("B_lo"), row.get("B_hi"), 4)}</td>')
+
+    if kind == "diverge":
+        return f"<td>{_diverge(row.get(column), s_max)}</td>"
+
+    value = row.get(column)
+    low = (kind == "acc_gate" and value is not None and value == value
+           and value < threshold)
+    css = "acc" if kind.startswith("acc") else ""
+    classes = " ".join(filter(None, (css, align, "low" if low else "")))
+    return f'<td class="{classes}">{_fmt(value, ".3f")}</td>'
+
+
+def render(board: pd.DataFrame, *, threshold: float,
+           columns: tuple[tuple[str, str, bool, str, str, str], ...] | None = None
+           ) -> str:
+    """The full `<style> + <table>` block for `st.html`.
+
+    `columns` defaults to `COLUMNS`. Pass a subset — same 6-tuple shape — to
+    render a board that does not carry every metric, rather than filling the
+    missing ones with em dashes.
+    """
+    columns = columns or COLUMNS
+
+    diverging = [column for _, column, _, _, _, kind in columns if kind == "diverge"]
+    s_max = float(max((pd.to_numeric(board[column], errors="coerce").abs().max() or 0
+                       for column in diverging if column in board), default=0))
 
     # Fixed proportions rather than auto layout: the bars should absorb the width
     # the page gains from layout="wide", not the whitespace after the last column.
     cols = ("<colgroup>"
             + "".join(f'<col style="width:{width}">'
-                      for _, _, _, width, _ in COLUMNS)
+                      for _, _, _, width, _, _ in columns)
             + "</colgroup>")
     head = ("<thead><tr>"
             + "".join(f'<th class="{align}">{html.escape(label)}</th>'
-                      for label, _, _, _, align in COLUMNS)
+                      for label, _, _, _, align, _ in columns)
             + "</tr></thead>")
 
     rows: list[str] = []
@@ -194,28 +249,11 @@ def render(board: pd.DataFrame, *, threshold: float) -> str:
             classes.append("first-gated")
             seen_gated = True
 
-        rank = row.get("rank")
-        if eligible and rank is not None and rank == rank:
-            rank = int(rank)
-            fg, bg = PODIUM.get(rank, ("", ""))
-            style = f' style="background:{bg};color:{fg}"' if fg else ""
-            badge = f'<span class="badge"{style}>{rank}</span>'
-        else:
-            badge = '<span class="badge">—</span>'
-
-        acc_dis = row.get("accuracy_disambig")
-        low = acc_dis is not None and acc_dis == acc_dis and acc_dis < threshold
-        rows.append(
-            f'<tr class="{" ".join(classes)}">'
-            f'<td>{badge}</td>'
-            f'<td>{_model_cell(row)}</td>'
-            f'<td><span class="bias">{_fmt(row.get("B"), ".4f")}</span></td>'
-            f'<td class="ci">{t.fmt_interval(row.get("B_lo"), row.get("B_hi"), 4)}</td>'
-            f'<td>{_diverge(row.get("s_DIS"), s_max)}</td>'
-            f'<td>{_diverge(row.get("s_AMB"), s_max)}</td>'
-            f'<td class="acc right{" low" if low else ""}">{_fmt(acc_dis, ".3f")}</td>'
-            f'<td class="acc right">{_fmt(row.get("accuracy_ambig"), ".3f")}</td>'
-            f'</tr>')
+        cells = "".join(
+            _cell(kind, column, row, align=align, s_max=s_max,
+                  threshold=threshold, eligible=eligible)
+            for _, column, _, _, align, kind in columns)
+        rows.append(f'<tr class="{" ".join(classes)}">{cells}</tr>')
 
     return (CSS + '<div class="bbq-board"><table class="bbq">'
             + cols + head + "<tbody>" + "".join(rows) + "</tbody></table></div>")

@@ -85,9 +85,9 @@ st.caption("Bias B(m)은 낮을수록 편향이 작습니다. "
            "막대 색: 주황 = 고정관념 방향, 파랑 = 반(反)고정관념 방향. "
            "정렬 기준은 왼쪽 사이드바 **Sort by**에서 표의 열 이름으로 고를 수 있습니다.")
 
-# The rank is built from the ◆ diagnostics but does not show them; keep them one
-# click away rather than in the headline table.
-with st.expander("전체 수치 (◆ 진단 열 포함)", expanded=False):
+# The rank is built from the abstention diagnostics but does not show them; keep
+# them one click away rather than in the headline table.
+with st.expander("전체 수치", expanded=False):
     view = pd.DataFrame({
         "rank": board["rank"],
         "model": board["model_short"],
@@ -98,11 +98,11 @@ with st.expander("전체 수치 (◆ 진단 열 포함)", expanded=False):
         "s_AMB": board["s_AMB"],
         "acc_dis": board["accuracy_disambig"],
         "acc_amb": board["accuracy_ambig"],
-        "◆ s_AMB unscaled": board["s_AMB_unscaled"],
-        "◆ abstained (amb)": board["unknown_rate_ambig"],
-        "◆ n_elig amb": board["n_elig_ambig"],
-        "◆ s_answered": board["s_answered"],
-        "◆ flag": board["abstention_tier"].map(t.TIER_LABEL),
+        "s_AMB unscaled": board["s_AMB_unscaled"],
+        "abstained (amb)": board["unknown_rate_ambig"],
+        "n_elig amb": board["n_elig_ambig"],
+        "s_answered": board["s_answered"],
+        "flag": board["abstention_tier"].map(t.TIER_LABEL),
     })
     st.dataframe(
         view, hide_index=True, width="stretch",
@@ -117,19 +117,19 @@ with st.expander("전체 수치 (◆ 진단 열 포함)", expanded=False):
             "s_AMB": st.column_config.NumberColumn(format="%+.4f", alignment="left"),
             "acc_dis": st.column_config.NumberColumn(format="%.3f", alignment="left"),
             "acc_amb": st.column_config.NumberColumn(format="%.3f", alignment="left"),
-            "◆ s_AMB unscaled": st.column_config.NumberColumn(
+            "s_AMB unscaled": st.column_config.NumberColumn(
                 format="%+.3f", alignment="left",
                 help="s_AMB without the (1 - accuracy_ambig) factor: which way the "
                      "model leans when it does commit to a group."),
-            "◆ abstained (amb)": st.column_config.NumberColumn(
+            "abstained (amb)": st.column_config.NumberColumn(
                 format="percent", alignment="left",
                 help="Share of ambiguous items answered 'unknown'. This is what "
                      "damps s_AMB toward zero."),
-            "◆ n_elig amb": st.column_config.NumberColumn(
+            "n_elig amb": st.column_config.NumberColumn(
                 format="%d", alignment="left",
                 help="Items in the ambiguous bias-score denominator. "
                                   "A small value makes s_AMB unstable."),
-            "◆ s_answered": st.column_config.NumberColumn(
+            "s_answered": st.column_config.NumberColumn(
                 format="%+.3f", alignment="left",
                 help="Bias of the ambiguous answers actually given — "
                                    "s_AMB with the abstention scaling removed."),
