@@ -432,6 +432,12 @@ def publish_run(conn: sqlite3.Connection, run_dir: Path, *,
     """Drop-and-rebuild one run inside a single transaction. Cheaper and safer
     than an upsert at 31k rows, and it cannot leave a half-updated run behind."""
     meta = bm.load_meta(run_dir)
+    if meta.get("arm") == "binary":
+        # Binary-arm runs (pipeline_binary.py -> runs_binary/) drop the unknown
+        # option, so accuracy_ambig does not exist and s_AMB is unscaled there.
+        # Publishing them would put incomparable scores in one ranking.
+        raise SystemExit(f"{run_dir}: binary-arm run — the leaderboard is 3-option only "
+                         f"(aggregate it with aggregate_binary.py instead)")
     run_id = meta["run_id"]
     df = bm.load_records(run_dir / "records.jsonl")
 

@@ -32,6 +32,10 @@ def load_records(paths, run_id_filter=None):
                 if not line:
                     continue
                 record = json.loads(line)
+                if record.get("arm") == "binary":
+                    raise SystemExit(
+                        f"{path}: these are binary-arm records (A/B, no unknown option) — "
+                        f"aggregate them with aggregate_binary.py")
                 if run_id_filter and record["run_id"] != run_id_filter:
                     continue
                 records.append(record)

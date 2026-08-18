@@ -55,8 +55,18 @@ streamlit run ../leaderboard/app/Home.py
 
 `run_ladder.sh` drives all five for a list of models. See `bbq_pipeline/README.md`.
 
+There is a second, **binary arm** (`pipeline_binary.py` / `aggregate_binary.py` /
+`run_ladder_binary.sh` / `config_binary.json`) that asks the same items as a forced A/B
+choice with the "unknown" option removed from the prompt in *both* context conditions.
+Its runs live in `bbq_pipeline/runs_binary/` and are never published: `publish.py` and
+`aggregate.py` refuse binary input, `aggregate_binary.py` refuses 3-option input, and the
+leaderboard stays 3-option only. `serve_logprobs.py` is shared unchanged. In that arm
+ambiguous items have **no correct answer** (`label`/`correct` are null, `accuracy_ambig`
+is null) and `s_AMB` is *unscaled* — it is comparable to the 3-option `s_AMB_unscaled`,
+not to `s_AMB`. See the "Binary arm" section of `bbq_pipeline/README.md`.
+
 - `bbq_pipeline/bbq_metrics.py` is the **single source of truth for every metric** — `summarize`, `answered_stats`, `polarity_stats`, `wilson`, the margin stats, the palette, and the bootstrap. `publish.py` and the analysis notebooks both import it. Do not restate a metric anywhere else.
-- `bbq_pipeline/aggregate.py` is deliberately left alone: it is the oracle that `publish.py --verify` checks against (1,441 exact comparisons). Changing it destroys the check.
+- `bbq_pipeline/aggregate.py` is deliberately left alone: it is the oracle that `publish.py --verify` checks against (1,441 exact comparisons). Changing it destroys the check. (Its only edit is an input guard that rejects binary-arm records — no metric logic touched; re-aggregating a run still reproduces its committed `summary.json` byte-for-byte.)
 - The three `pipeline*.ipynb` notebooks (Qwen2.5 / Llama / Ministral) are exploratory and still hold their own copies of those functions; `leaderboard/app/pages/2_Scaling_curves.py` reproduces their headline figures from the database.
 
 **Metric gotcha that matters more than any other:** `is_biased` / `is_target` are tri-state — `None` for an unknown prediction and for the ~16 examples with no `target_loc`, never `False`. `fillna(0)` on either counts every abstention as an anti-stereotype pick and drags every bias score downward.
@@ -66,6 +76,8 @@ streamlit run ../leaderboard/app/Home.py
 ## Leaderboard (`leaderboard/`)
 
 `bbq.sqlite` (gitignored, regenerable) + committed CSV/JSON exports + a Streamlit app. Ranking is `B(m) = |s_DIS| + |s_AMB|` ascending among models passing `accuracy_disambig >= 0.7`, within a comparability group, with a paired cluster-bootstrap CI on B.
+
+Two pages do **not** read `bbq.sqlite`: `3_External_leaderboard` (results published by other people, from `leaderboard/external/`) and `4_Binary_leaderboard` (the binary arm, read straight from `bbq_pipeline/runs_binary/*/summary.json` via `app/lib/binary.py`). The binary board drops `acc_amb` and every abstention diagnostic — they do not exist without an unknown option — and shows `target_rate` / `letter_A_rate` instead. `table.render(..., columns=...)` takes a column subset, which is how both pages render a board that lacks some metrics.
 
 ## Data schema (`data/*.jsonl`, one JSON object per line)
 

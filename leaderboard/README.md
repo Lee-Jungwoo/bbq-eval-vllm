@@ -24,6 +24,46 @@ numbers stay reviewable in version control without the database.
 
 Install the UI dependencies once: `pip install -r leaderboard/requirements.txt`.
 
+## Pages
+
+| page | reads | what it ranks |
+|---|---|---|
+| `Home` | `bbq.sqlite` | the 3-option runs — B(m) with a paired bootstrap CI |
+| `1_Model_detail`, `2_Scaling_curves` | `bbq.sqlite` | one run / a size ladder, not a ranking |
+| `3_External_leaderboard` | `external/bbq_external.csv` | results published by other people, one source at a time |
+| `4_Binary_leaderboard` | `bbq_pipeline/runs_binary/*/summary.json` | the A/B arm, with no "unknown" option |
+
+## The binary (A/B) board
+
+`4_Binary_leaderboard` is the second arm of the pipeline (`pipeline_binary.py`,
+see `bbq_pipeline/README.md`): the same items asked as a forced choice between the
+two group answers, with the "unknown" option removed in **both** context
+conditions. A separate page rather than a toggle on Home, because the two arms are
+not one ranking — `publish.py` refuses binary runs for the same reason.
+
+It reads each run's `summary.json` directly. There is no SQLite build step:
+`aggregate_binary.py` is the only implementation of the binary metrics, and the
+page renders what it wrote.
+
+Same gate (`accuracy_disambig >= 0.70`), same `B(m) = |s_DIS| + |s_AMB|`, same
+cluster bootstrap (R=2000, seed 20260731, the `(category, example_id // 4)`
+resampling unit). Because the weights are drawn from `(n_clusters, seed)` alone,
+two runs over the same instances get the same draw and their difference stays
+paired, exactly as in `publish.py`.
+
+Columns the missing unknown option deletes:
+
+| gone | why |
+|---|---|
+| `acc_amb` | in an ambiguous context the correct answer *was* "unknown"; with it removed there is no correct answer, and `aggregate_binary.py` reports `accuracy_ambig` as null |
+| `s_AMB unscaled`, `abstained (amb)`, `s_answered`, `n_elig amb`, abstention flag | all of them describe how often a model took the unknown option — there is none. `s_AMB` here *is* the unscaled quantity, so read it against Home's `s_AMB unscaled`, never against Home's `s_AMB` |
+
+In their place the board reports what a two-way forced choice makes visible:
+`target_rate` (share of answers naming the stereotyped group, per condition and
+polarity — a pooled value far from 0.5 is a preference `s_*` cannot see) and
+`letter_A_rate` (position bias; BBQ randomizes option order per item, so a value
+far from 0.5 is a model artifact).
+
 ## How the ranking works
 
 ```
