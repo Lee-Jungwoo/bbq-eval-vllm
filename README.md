@@ -67,36 +67,44 @@
 
 ### 모델별 설정
 
-모든 run은 `configs/serving/*.yaml`의 값과 같은 기본값으로 돌았다. "근거" 열의 "로그 확인"은 엔진 로그(`results/serving_logs/`)에 값이 남아 있다는 뜻이고(원 조건 run만, vLLM 0.10.2), "스크립트 기본값"은 `scripts/run_ladder.sh` 기본값이며 실행할 때 env로 바꿨는지는 기록이 없다는 뜻이다. 동시성은 `serve_logprobs.py`가 `llm.generate()` 한 번에 넘기는 프롬프트 수(batch)와 vLLM 스케줄러 `max_num_seqs`로 적었다. tensor_parallel_size는 모두 1이고 quantization 인자는 넘기지 않았다.
+하드웨어는 연구실 GPU 서버의 NVIDIA GeForce RTX 3090 24GB 2장이다. 기본은 한 장(TP 1)이고, 두 장(TP 2)을 쓴 모델은 표에 적었다.
 
-| 모델 | 파라미터(B) | dtype | max_model_len | gpu_memory_utilization | 동시성 | GPU | 근거 |
-|---|---|---|---|---|---|---|---|
-| [gpt-oss-20b](configs/serving/gpt-oss-20b.yaml) | 20 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [gemma-4-E2B-it](configs/serving/gemma-4-e2b-it.yaml) | 2 (effective) | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [gemma-4-E4B-it](configs/serving/gemma-4-e4b-it.yaml) | 4 (effective) | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [gemma-4-12B-it](configs/serving/gemma-4-12b-it.yaml) | 12 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [Llama-3.2-1B-Instruct](configs/serving/llama-3.2-1b-instruct.yaml) | 1 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [Llama-3.2-3B-Instruct](configs/serving/llama-3.2-3b-instruct.yaml) | 3 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [Llama-3.1-8B-Instruct](configs/serving/llama-3.1-8b-instruct.yaml) | 8 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [Ministral-3-3B-Instruct-2512-BF16](configs/serving/ministral-3-3b-instruct-2512-bf16.yaml) | 3 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값, limit_images 0 | 기록 없음 | 스크립트 기본값 |
-| [Ministral-3-8B-Instruct-2512-BF16](configs/serving/ministral-3-8b-instruct-2512-bf16.yaml) | 8 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값, limit_images 0 | 기록 없음 | 스크립트 기본값 |
-| [Ministral-3-14B-Instruct-2512-BF16](configs/serving/ministral-3-14b-instruct-2512-bf16.yaml) | 14 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값, limit_images 0 | 기록 없음 | 스크립트 기본값 |
-| [Qwen2.5-0.5B-Instruct](configs/serving/qwen2.5-0.5b-instruct.yaml) | 0.5 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 로그 확인 |
-| [Qwen2.5-1.5B-Instruct](configs/serving/qwen2.5-1.5b-instruct.yaml) | 1.5 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 로그 확인 |
-| [Qwen2.5-3B-Instruct](configs/serving/qwen2.5-3b-instruct.yaml) | 3 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 로그 확인 |
-| [Qwen2.5-7B-Instruct](configs/serving/qwen2.5-7b-instruct.yaml) | 7 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [Qwen2.5-14B-Instruct](configs/serving/qwen2.5-14b-instruct.yaml) | 14 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [Qwen3-0.6B](configs/serving/qwen3-0.6b.yaml) | 0.6 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [Qwen3-1.7B](configs/serving/qwen3-1.7b.yaml) | 1.7 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [Qwen3-4B](configs/serving/qwen3-4b.yaml) | 4 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [Qwen3-8B](configs/serving/qwen3-8b.yaml) | 8 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [Qwen3-14B](configs/serving/qwen3-14b.yaml) | 14 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [Qwen3.5-0.8B](configs/serving/qwen3.5-0.8b.yaml) | 0.8 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [Qwen3.5-2B](configs/serving/qwen3.5-2b.yaml) | 2 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [Qwen3.5-4B](configs/serving/qwen3.5-4b.yaml) | 4 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
-| [Qwen3.5-9B](configs/serving/qwen3.5-9b.yaml) | 9 | bfloat16 | 1024 | 0.90 | batch 512, max_num_seqs 기본값 | 기록 없음 | 스크립트 기본값 |
+"근거" 열은 값의 출처다.
 
-GPU 모델은 어느 run에도 기록이 없다. 그 밖에 기록이 없는 항목은 [`docs/serving.md`](docs/serving.md#기록-없음)에 모았다.
+- **로그 확인**: 엔진 로그(`results/serving_logs/`)에 값이 남아 있다. 원 조건 run만 해당하며, vLLM 0.10.2다.
+- **세션 권장값**: 당시 Claude Code 세션에서 권장한 실행 명령이 남아 있고, 그대로 실행했다(원 조건 run만, [`docs/serving.md`](docs/serving.md#세션-기록의-권장값)).
+- **스크립트 기본값**: `scripts/run_ladder.sh` 기본값이다. 실행할 때 env로 바꿨는지는 기록이 없다.
+
+강제 선택 조건 run은 24개 모두 로그와 세션 기록이 없어 스크립트 기본값으로 적었다. 동시성은 `serve_logprobs.py`가 `llm.generate()` 한 번에 넘기는 프롬프트 수(batch)와 vLLM 스케줄러 `max_num_seqs`로 적었다(2026-07-28 오류 메시지 기준으로 당시 vLLM 기본값은 256). quantization 인자는 넘기지 않았다.
+
+| 모델 | 파라미터(B) | dtype | max_model_len | gpu_memory_utilization | TP | 동시성 | GPU | 근거 |
+|---|---|---|---|---|---|---|---|---|
+| [gpt-oss-20b](configs/serving/gpt-oss-20b.yaml) | 20 | bfloat16 | 1024 | 0.90 | 1 | batch 512, max_num_seqs 기본값 | RTX 3090 24GB × 1 | 스크립트 기본값 |
+| [gemma-4-E2B-it](configs/serving/gemma-4-e2b-it.yaml) | 2 (effective) | bfloat16 | 1024 | 0.90 | 1 | batch 512, max_num_seqs 기본값 | RTX 3090 24GB × 1 | 스크립트 기본값 |
+| [gemma-4-E4B-it](configs/serving/gemma-4-e4b-it.yaml) | 4 (effective) | bfloat16 | 1024 | 0.90 | 1 | batch 512, max_num_seqs 기본값 | RTX 3090 24GB × 1 | 스크립트 기본값 |
+| [gemma-4-12B-it](configs/serving/gemma-4-12b-it.yaml) | 12 | bfloat16 | 1024 | 0.90 | 1 | batch 512, max_num_seqs 기본값 | RTX 3090 24GB × 1 | 스크립트 기본값 |
+| [Llama-3.2-1B-Instruct](configs/serving/llama-3.2-1b-instruct.yaml) | 1 | bfloat16 | 1024 | 0.90 | 1 | batch 512, max_num_seqs 기본값 | RTX 3090 24GB × 1 | 스크립트 기본값 |
+| [Llama-3.2-3B-Instruct](configs/serving/llama-3.2-3b-instruct.yaml) | 3 | bfloat16 | 1024 | 0.90 | 1 | batch 512, max_num_seqs 기본값 | RTX 3090 24GB × 1 | 스크립트 기본값 |
+| [Llama-3.1-8B-Instruct](configs/serving/llama-3.1-8b-instruct.yaml) | 8 | bfloat16 | 1024 | 0.90 | 1 | batch 512, max_num_seqs 기본값 | RTX 3090 24GB × 1 | 스크립트 기본값 |
+| [Ministral-3-3B-Instruct-2512-BF16](configs/serving/ministral-3-3b-instruct-2512-bf16.yaml) | 3 | bfloat16 | 1024 | 0.90 | 1 | batch 512, max_num_seqs 기본값, limit_images 0 | RTX 3090 24GB × 1 | 스크립트 기본값 |
+| [Ministral-3-8B-Instruct-2512-BF16](configs/serving/ministral-3-8b-instruct-2512-bf16.yaml) | 8 | bfloat16 | 1024 | 0.90 | 1 | batch 512, max_num_seqs 기본값, limit_images 0 | RTX 3090 24GB × 1 | 스크립트 기본값 |
+| [Ministral-3-14B-Instruct-2512-BF16](configs/serving/ministral-3-14b-instruct-2512-bf16.yaml) | 14 | bfloat16 | 1024 | 0.90 | 1 | batch 512, max_num_seqs 기본값, limit_images 0 | RTX 3090 24GB × 1 | 스크립트 기본값 |
+| [Qwen2.5-0.5B-Instruct](configs/serving/qwen2.5-0.5b-instruct.yaml) | 0.5 | bfloat16 | 1024 | 0.90 | 1 | batch 512, max_num_seqs 기본값 | RTX 3090 24GB × 1 | 로그 확인 |
+| [Qwen2.5-1.5B-Instruct](configs/serving/qwen2.5-1.5b-instruct.yaml) | 1.5 | bfloat16 | 1024 | 0.90 | 1 | batch 512, max_num_seqs 기본값 | RTX 3090 24GB × 1 | 로그 확인 |
+| [Qwen2.5-3B-Instruct](configs/serving/qwen2.5-3b-instruct.yaml) | 3 | bfloat16 | 1024 | 0.90 | 1 | batch 512, max_num_seqs 기본값 | RTX 3090 24GB × 1 | 로그 확인 |
+| [Qwen2.5-7B-Instruct](configs/serving/qwen2.5-7b-instruct.yaml) | 7 | bfloat16 | 1024 | 0.90 | 1 | batch 512, max_num_seqs 기본값 | RTX 3090 24GB × 1 | 스크립트 기본값 |
+| [Qwen2.5-14B-Instruct](configs/serving/qwen2.5-14b-instruct.yaml) | 14 | bfloat16 | 1024 | 0.90 | 2 | batch 512, max_num_seqs 64 | RTX 3090 24GB × 2 | 세션 권장값 |
+| [Qwen3-0.6B](configs/serving/qwen3-0.6b.yaml) | 0.6 | bfloat16 | 1024 | 0.90 | 2 | batch 512, max_num_seqs 64 | RTX 3090 24GB × 2 | 세션 권장값 |
+| [Qwen3-1.7B](configs/serving/qwen3-1.7b.yaml) | 1.7 | bfloat16 | 1024 | 0.90 | 2 | batch 512, max_num_seqs 64 | RTX 3090 24GB × 2 | 세션 권장값 |
+| [Qwen3-4B](configs/serving/qwen3-4b.yaml) | 4 | bfloat16 | 1024 | 0.90 | 2 | batch 512, max_num_seqs 64 | RTX 3090 24GB × 2 | 세션 권장값 |
+| [Qwen3-8B](configs/serving/qwen3-8b.yaml) | 8 | bfloat16 | 1024 | 0.90 | 2 | batch 512, max_num_seqs 64 | RTX 3090 24GB × 2 | 세션 권장값 |
+| [Qwen3-14B](configs/serving/qwen3-14b.yaml) | 14 | bfloat16 | 1024 | 0.90 | 2 | batch 512, max_num_seqs 64 | RTX 3090 24GB × 2 | 세션 권장값 |
+| [Qwen3.5-0.8B](configs/serving/qwen3.5-0.8b.yaml) | 0.8 | bfloat16 | 2048 | 0.90 | 1 | batch 512, max_num_seqs 기본값 | RTX 3090 24GB × 1 | 세션 권장값 |
+| [Qwen3.5-2B](configs/serving/qwen3.5-2b.yaml) | 2 | bfloat16 | 2048 | 0.90 | 1 | batch 512, max_num_seqs 기본값 | RTX 3090 24GB × 1 | 세션 권장값 |
+| [Qwen3.5-4B](configs/serving/qwen3.5-4b.yaml) | 4 | bfloat16 | 2048 | 0.90 | 1 | batch 512, max_num_seqs 기본값 | RTX 3090 24GB × 1 | 세션 권장값 |
+| [Qwen3.5-9B](configs/serving/qwen3.5-9b.yaml) | 9 | bfloat16 | 2048 | 0.90 | 1 | batch 512, max_num_seqs 기본값 | RTX 3090 24GB × 1 | 세션 권장값 |
+
+기록이 없는 항목(로그도 세션도 없는 run의 실제 인자, 대부분 run의 vLLM 버전 등)은 [`docs/serving.md`](docs/serving.md#기록-없음)에 모았다.
 
 ## 3. 평가 파이프라인 흐름
 
@@ -212,7 +220,7 @@ streamlit run app/Home.py
 - Qwen2.5-14B-Instruct는 강제 선택 조건에서 100문항의 두 라벨 토큰이 모두 상위 50 logprob 밖이어서 예측 없음으로 처리되었다(`n_unmeasurable`).
 - 원 조건 순위의 인접 순위 19쌍 중 bootstrap 95% CI로 구분되는 쌍은 4쌍뿐이다([`docs/leaderboard.md`](docs/leaderboard.md#confidence-intervals)).
 
-throughput, latency, GPU 메모리 사용량은 측정 기록이 없어 적지 않았다.
+throughput, latency, GPU 메모리 사용량은 측정하지 않았다.
 
 ## 5. 재현 방법과 디렉터리 구조
 
@@ -279,7 +287,7 @@ third_party/bbq/              원본 NYU BBQ (데이터, 템플릿, R 채점 스
 - 연구실 내부 실험이다. 외부 검증을 받거나 논문으로 정리된 결과가 아니다.
 - 프롬프트 템플릿 하나, 첫 토큰 logprob 채점 하나로만 측정했다. 프롬프트 문구, few-shot 여부, 생성 후 파싱 방식이 바뀌면 결과가 달라질 수 있으며 이 레포는 그 민감도를 재지 않았다.
 - 모델당 조건별 실행은 한 번이다. 신뢰구간은 문항(템플릿 묶음) 재표집 bootstrap으로만 냈다.
-- 서빙 기록이 부족하다. GPU 모델은 기록이 없고, 엔진 로그는 원 조건 Qwen2.5 세 run에만 있다. 나머지 run은 스크립트 기본값으로 돌렸다고 보는 것이 최선이며, 실제로 override했는지는 확인할 수 없다.
+- 서빙 기록이 부족하다. 엔진 로그는 원 조건 Qwen2.5 세 run에만 있고, 원 조건 10개 run은 세션의 권장 명령으로만 남아 있다. 나머지 run(강제 선택 조건 24개 포함)은 스크립트 기본값으로 돌렸다고 보는 것이 최선이며, 실제로 override했는지는 확인할 수 없다.
 - throughput, latency 같은 서빙 성능은 측정하지 않았다. 이 레포는 서빙 성능 벤치마크가 아니라 서빙을 이용한 평가 파이프라인이다.
 - 강제 선택 조건은 일부 모델에서 라벨 토큰 확률 합이 낮고(최저 0.576) 위치 편향이 크다. 이런 모델의 강제 선택 결과는 조심해서 읽어야 한다.
 - BBQ 자체의 범위를 따른다. 미국 영어 맥락의 고정관념만 다루며, 이 레포는 교차 카테고리 2개를 제외했다.
