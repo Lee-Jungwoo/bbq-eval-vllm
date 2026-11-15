@@ -11,7 +11,7 @@ There is no build system or test suite. Work here is the evaluation pipeline, th
 ## Layout
 
 - `src/bbq_eval/` — the evaluation pipeline package (run with `PYTHONPATH=src python -m bbq_eval.<module>`).
-- `configs/serving/<model>.yaml` — per-model vLLM flags (copied from `run_ladder.sh` defaults; `provenance` says which a log confirms). `configs/eval/{original,forced_choice}.json` — the two conditions.
+- `configs/serving/<model>.yaml` — per-model vLLM flags, one block per condition (`original`, `forced_choice`), holding the engine args each recorded run actually used (read from the lab server's vLLM logs; `provenance` has the vLLM version and server log path). `configs/eval/{original,forced_choice}.json` — the two conditions.
 - `scripts/` — `serve.py`, `run_eval.py`, `run_ladder*.sh`, `export_summary.py`.
 - `results/` — `runs/`, `runs_binary/` (only `meta.json`/`summary.json` tracked), `leaderboard/` (exports + gitignored `bbq.sqlite`), `serving_logs/`, `summary_*.csv`.
 - `app/` — Streamlit app. `docs/` — `serving.md`, `pipeline.md`, `leaderboard.md`.

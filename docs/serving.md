@@ -5,11 +5,10 @@
 
 ## 하드웨어
 
-연구실 GPU 서버의 NVIDIA GeForce RTX 3090 24GB 2장을 썼다. 레포의 실행 기록에는 GPU
-정보가 없고, 사용자가 알려준 값(2026-11-15)과 2026-07-28 Claude Code 세션의 "24GB짜리 두 장"
-발언이 근거다. 엔진 로그의 메모리 수치(아래 표, `gpu_memory_utilization` 0.9에서 모델과
-KV cache를 합쳐 약 20 GiB)도 장당 24GB와 맞는다. 기본은 `GPU=1`로 한 장만 쓰고, 세션에서
-권장한 일부 모델은 `GPU=0,1`(tensor parallel 2)로 두 장을 썼다.
+연구실 GPU 서버의 NVIDIA GeForce RTX 3090 24GB(24,576 MiB) 2장, 드라이버 555.42.06이다(서버의
+`nvidia-smi`, 2026-11-15 확인). 엔진 로그의 메모리 수치(아래 표, `gpu_memory_utilization`
+0.9에서 모델과 KV cache를 합쳐 약 20 GiB)도 장당 24GB와 맞는다. run마다 한 장(TP 1) 또는 두
+장(TP 2)을 썼다.
 
 ## 실행 방식
 
@@ -33,60 +32,112 @@ logprob 중 가장 큰 것을 예측으로 쓰므로 디코딩 결과 텍스트�
 
 ## 설정 파일
 
-모델마다 `configs/serving/<model>.yaml`이 하나씩 있다(24개). `scripts/serve.py`가 이
-파일을 읽어 `serve_logprobs.py` 인자로 바꿔 실행한다. 값은 실험을 실제로 돌린
-`scripts/run_ladder.sh`의 env 기본값과 `serve_logprobs.py`의 argparse 기본값을 그대로
-옮긴 것이다.
+모델마다 `configs/serving/<model>.yaml`이 하나씩 있다(24개). 파일 안에 `original`과
+`forced_choice` 두 블록이 있고, 각 블록에 그 조건의 run이 실제로 쓴 엔진 인자, runner 인자,
+`CUDA_VISIBLE_DEVICES`, 근거(`provenance`: vLLM 버전, 서버의 로그 경로, 메모)를 적었다.
+같은 모델이라도 조건마다 인자가 다른 경우가 많아서 블록을 나눴다. `scripts/serve.py`는
+run 디렉터리의 `meta.json`(`"arm": "binary"` 여부)으로 블록을 고르고, 그 값을
+`serve_logprobs.py` 인자로 바꿔 실행한다.
 
 ```bash
-# 준비된 run 디렉터리를 입력으로 (revision은 그 run의 meta.json 값을 쓴다)
+# 준비된 run 디렉터리를 입력으로 (조건과 revision은 그 run의 meta.json에서 읽는다)
 python scripts/serve.py --config configs/serving/qwen2.5-3b-instruct.yaml \
     --run-dir results/runs/Qwen2.5-3B-Instruct_bfloat16_6db43b09
 
+# 서버에 requests.jsonl만 있을 때는 조건을 직접 지정
+python scripts/serve.py --config qwen2.5-3b-instruct.yaml --condition forced_choice \
+    --input requests.jsonl --output responses.jsonl
+
 # 실제 실행 없이 명령과 환경 변수만 출력
-python scripts/serve.py --config configs/serving/qwen2.5-3b-instruct.yaml \
-    --run-dir results/runs/Qwen2.5-3B-Instruct_bfloat16_6db43b09 --dry-run
+python scripts/serve.py --config ... --run-dir ... --dry-run
 ```
+
+## 값의 근거
+
+모든 값은 연구실 서버에 남은 vLLM 엔진 로그에서 읽었다. 각 run의 `*.2_serve.log`에 vLLM이
+찍는 `non-default args`(기본값과 다른 인자만 나온다), 엔진 버전, `quantization`,
+`tensor_parallel_size` 줄을 사용자가 서버에서 화면으로 확인해 가져왔다(2026-11-15). 서버
+로그 파일은 크기가 커서 레포에 넣지 않았다. yaml의 `provenance.log`에 서버 쪽 경로가 있고,
+2026-07-25 Qwen2.5 래더 로그만 `results/serving_logs/`에 커밋되어 있다.
+
+예외는 원 조건 Qwen2.5-7B 하나다. 래더 스크립트가 생기기 전에 손으로 돌려서 엔진 로그가
+남지 않았고, 값은 서버의 셸 히스토리(`CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=1
+python serve_logprobs.py ... --max-model-len 1024`)와 그 시점 `serve_logprobs.py`의 기본값에서
+왔다. batch는 기본값 256이었고, 재개한 일부 실행에서는 64였다. batch는 결과에 영향이 없다.
+이 run의 vLLM 버전은 기록이 없다.
 
 ## 엔진 인자 (`vllm.LLM(...)`)
 
-| 인자 | 값 | 어디서 오는가 |
-|---|---|---|
-| `model`, `revision` | HF 모델 이름, 고정 commit sha | `prepare`가 `main`을 sha로 바꿔 `meta.json`에 기록 |
-| `dtype` | `bfloat16` (24개 모델 전부) | `run_ladder.sh` `DTYPE`, 모든 run의 `meta.json` |
-| `max_model_len` | 1024. Qwen3.5 4종(원 조건)만 2048 (세션 권장값) | `run_ladder.sh` `MAX_MODEL_LEN`. 길이가 기록된 run 중 가장 긴 프롬프트는 279 토큰(gpt-oss-20b, 원 조건) |
-| `gpu_memory_utilization` | 0.90 | `run_ladder.sh` `GPU_MEM_UTIL` |
-| `tensor_parallel_size` | 1. Qwen2.5-14B와 Qwen3 5종(원 조건)만 2 (세션 권장값) | `run_ladder.sh` `TP`, 기본은 `GPU` 목록의 장치 수 |
-| `max_logprobs` | 50 | `serve_logprobs.py --top-logprobs` 기본값 |
-| `max_num_seqs` | 지정 안 함 (vLLM 기본값). Qwen2.5-14B와 Qwen3 5종(원 조건)만 64 (세션 권장값) | `run_ladder.sh` `MAX_NUM_SEQS`, 기본은 빈 값 |
-| `limit_mm_per_prompt` | Ministral 3종만 `{"image": 0}` | `run_ladder.sh` 사용 예시와 `docs/pipeline.md` |
-| `quantization` | 넘기지 않음 | `serve_logprobs.py`에 해당 인자가 없음 |
+| 인자 | 값 |
+|---|---|
+| `model`, `revision` | HF 모델 이름, 고정 commit sha (`prepare`가 `main`을 sha로 바꿔 `meta.json`에 기록) |
+| `dtype` | `bfloat16` (48개 run 전부) |
+| `max_model_len` | 1024 (48개 run 전부). 길이가 기록된 run 중 가장 긴 프롬프트는 279 토큰(gpt-oss-20b, 원 조건) |
+| `gpu_memory_utilization` | 0.90. 원 조건 Ministral 3종만 0.80 |
+| `tensor_parallel_size` | 1 또는 2 (아래 표) |
+| `max_num_seqs` | 지정하지 않으면 vLLM 기본값 256(두 버전 모두 오류 메시지에서 확인). 일부 run은 64 |
+| `max_logprobs` | 50 |
+| `limit_mm_per_prompt` | `{"image": 0}`: 원 조건 Ministral, gemma-4, gpt-oss와 강제 선택 조건 24개 전부. 강제 선택 래더는 모든 모델에 `LIMIT_IMAGES=0`을 넘겼고, 텍스트 전용 모델에는 영향이 없다 |
+| `quantization` | 인자로 넘긴 적은 없다. 엔진은 gpt-oss-20b에서만 체크포인트 설정에 따라 `gpt_oss_mxfp4`를 적용했고, 나머지 run은 로그에 `quantization=None` |
 
-`batch_size`(기본 512)는 vLLM 인자가 아니라 `serve_logprobs.py`가 `llm.generate()`
-한 번에 넘기는 프롬프트 수다. 실제로 동시에 스케줄되는 시퀀스 수는 vLLM 스케줄러의
-`max_num_seqs`가 정한다. `run_ladder.sh`에 `TP`와 `MAX_NUM_SEQS` 옵션이 추가된 것은
-Qwen2.5-14B를 돌리다 메모리가 부족했을 때다(커밋 74b79f3, 64ddd15). bf16 가중치(약 29GB)가
-24GB 한 장에 들어가지 않아 두 장으로 나눴고, 그다음에는 엔진 초기화 마지막의 sampler
-warmup(더미 요청 256개, 요청마다 vocab 크기의 logits 행을 잡음)에서 메모리가 부족해
-`max_num_seqs`를 64로 낮췄다. 이 워크로드는 `max_tokens=1`이라 시퀀스가 한 스텝에 끝나므로
-동시성을 낮춰도 손해가 작다는 것이 당시 판단이었다. 처리 시간을 비교해 확인하지는 않았다.
+### run별 값
 
-## 세션 기록의 권장값
+"원"은 원 조건, "강제"는 강제 선택 조건이다. 기타 열의 `img 0`은 `limit_mm_per_prompt={"image": 0}`이다.
 
-엔진 로그가 없는 run 가운데 일부는 로컬 Claude Code 세션(54c52366, 2026-07-27과 07-28)에
-실행 명령을 권장한 기록이 남아 있다. 사용자는 권장대로 실행했다고 밝혔다. 실행 로그로
-확인된 값은 아니며, 원 조건 run에만 해당한다. 강제 선택 조건(2026-08-18, 19 실행)과 나머지
-모델의 세션은 이 머신에 남아 있지 않다.
+| 모델 | 원: vLLM | TP | util | max_num_seqs | 기타 | 강제: vLLM | TP | util | max_num_seqs | 기타 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| gpt-oss-20b | 0.26.0 | 2 | 0.90 | 64 | img 0, gpt_oss_mxfp4 | 0.26.0 | 2 | 0.90 | 64 | img 0, gpt_oss_mxfp4 |
+| gemma-4-E2B-it | 0.26.0 | 2 | 0.90 | 64 | img 0 | 0.26.0 | 1 | 0.90 | 64 | img 0 |
+| gemma-4-E4B-it | 0.26.0 | 2 | 0.90 | 64 | img 0 | 0.26.0 | 1 | 0.90 | 64 | img 0 |
+| gemma-4-12B-it | 0.26.0 | 2 | 0.90 | 64 | img 0 | 0.26.0 | 2 | 0.90 | 64 | img 0 |
+| Llama-3.2-1B-Instruct | 0.10.2 | 1 | 0.90 | 기본 |  | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Llama-3.2-3B-Instruct | 0.10.2 | 1 | 0.90 | 기본 |  | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Llama-3.1-8B-Instruct | 0.10.2 | 1 | 0.90 | 기본 |  | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Ministral-3-3B-Instruct-2512-BF16 | 0.26.0 | 2 | 0.80 | 64 | img 0 | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Ministral-3-8B-Instruct-2512-BF16 | 0.26.0 | 2 | 0.80 | 64 | img 0 | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Ministral-3-14B-Instruct-2512-BF16 | 0.26.0 | 2 | 0.80 | 64 | img 0 | 0.26.0 | 2 | 0.90 | 64 | img 0 |
+| Qwen2.5-0.5B-Instruct | 0.10.2 | 1 | 0.90 | 기본 |  | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Qwen2.5-1.5B-Instruct | 0.10.2 | 1 | 0.90 | 기본 |  | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Qwen2.5-3B-Instruct | 0.10.2 | 1 | 0.90 | 기본 |  | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Qwen2.5-7B-Instruct | 기록 없음 | 1 | 0.90 | 기본 | batch 256 | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Qwen2.5-14B-Instruct | 0.10.2 | 2 | 0.90 | 64 |  | 0.26.0 | 2 | 0.90 | 64 | img 0 |
+| Qwen3-0.6B | 0.10.2 | 2 | 0.90 | 기본 |  | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Qwen3-1.7B | 0.10.2 | 2 | 0.90 | 기본 |  | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Qwen3-4B | 0.10.2 | 2 | 0.90 | 기본 |  | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Qwen3-8B | 0.10.2 | 2 | 0.90 | 기본 |  | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Qwen3-14B | 0.26.0 | 2 | 0.90 | 64 |  | 0.26.0 | 2 | 0.90 | 64 | img 0 |
+| Qwen3.5-0.8B | 0.26.0 | 2 | 0.90 | 64 |  | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Qwen3.5-2B | 0.26.0 | 2 | 0.90 | 64 |  | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Qwen3.5-4B | 0.26.0 | 2 | 0.90 | 64 |  | 0.26.0 | 1 | 0.90 | 기본 | img 0 |
+| Qwen3.5-9B | 0.26.0 | 2 | 0.90 | 64 |  | 0.26.0 | 1 | 0.90 | 64 | img 0 |
 
-| 모델 | 권장 명령 | 시각 | 비고 |
-|---|---|---|---|
-| Qwen2.5-14B-Instruct | `GPU=0,1 MAX_NUM_SEQS=64 ./run_ladder.sh Qwen/Qwen2.5-14B-Instruct` | 07-28 02:09 | 이 명령 뒤 02:39에 사용자가 실행 완료를 알림 |
-| Qwen3 0.6B, 1.7B, 4B, 8B, 14B | `GPU=0,1 MAX_NUM_SEQS=64 ./run_ladder.sh Qwen/Qwen3-0.6B ... Qwen/Qwen3-14B` | 07-28 03:26, 03:42 | run 커밋은 08-03 |
-| Qwen3.5 0.8B, 2B, 4B, 9B | `GPU=1 MAX_MODEL_LEN=2048 ./run_ladder.sh Qwen/Qwen3.5-0.8B ... Qwen/Qwen3.5-9B` | 07-27 16:52 | `TP`, `MAX_NUM_SEQS` 옵션이 생기기 전의 권장. run 커밋은 08-03이라 그 사이 다른 권장이 있었는지는 알 수 없음 |
+TP 1인 run은 GPU 한 장(원 조건은 `GPU=1`, 강제 선택 조건은 `GPU=0`)을, TP 2인 run은 두
+장(`GPU=0,1`)을 썼다. 같은 모델이 조건에 따라 TP가 다르거나(Ministral 3B와 8B, Qwen3 0.6B부터
+8B, Qwen3.5, gemma-4 E2B와 E4B) vLLM 버전이 다르다(원 조건 Qwen2.5, Llama, Qwen3 0.6B부터
+8B는 0.10.2, 강제 선택 조건은 모두 0.26.0). 두 조건을 비교할 때 이 차이가 logprob에 주는
+영향은 확인하지 않았다.
 
-Qwen3.5의 `MAX_MODEL_LEN=2048`은 빈 think 블록 때문에 프롬프트가 길어진다는 이유로 권장된
-값이다. 실제 최장 프롬프트는 233 토큰이라 1024로도 충분했다. `max_model_len`은 엔진이 받을
-수 있는 길이 상한일 뿐이라 프롬프트와 logprob 결과는 바뀌지 않는다.
+### 설정이 바뀐 경위 (로그에 남은 실패 시도)
+
+`batch_size`(기본 512)는 vLLM 인자가 아니라 `serve_logprobs.py`가 `llm.generate()` 한 번에
+넘기는 프롬프트 수다. 실제로 동시에 스케줄되는 시퀀스 수는 vLLM 스케줄러의 `max_num_seqs`가
+정한다.
+
+- **Qwen2.5-14B (원 조건, 2026-07-28)**: TP 1, util 0.95로는 bf16 가중치(약 29GB)가 24GB 한
+  장에 들어가지 않았다. TP 2로 나누자 이번에는 엔진 초기화 마지막의 sampler warmup(더미 요청
+  256개, 요청마다 vocab 크기의 logits 행을 잡는다)에서 CUDA 메모리가 부족했다. 그래서
+  `max_num_seqs`를 64로 낮춰 완료했다. `run_ladder.sh`의 `TP`, `MAX_NUM_SEQS` 옵션이 이때 생겼다(커밋 74b79f3, 64ddd15).
+- **Ministral 3종 (원 조건, 2026-07-30)**: TP 2, util 0.9 시도가 여러 번 엔진 초기화에서
+  실패했고, util 0.80, `max_num_seqs` 64로 완료했다.
+- **Qwen3-14B, Qwen3.5 4종 (원 조건, 2026-07-31)**: 처음 래더(vLLM 0.10.2)에서 Qwen3-14B는
+  메모리 부족으로 실패했고 Qwen3.5는 엔진 초기화까지 가지 못했다. vLLM 0.26.0 환경에서
+  `max_num_seqs` 64로 다시 돌렸다. 앞서 끝난 Qwen3 0.6B부터 8B는 재실행에서 건너뛰었으므로
+  0.10.2 결과가 남았다.
+- **Qwen3.5-9B (강제 선택, 2026-08-18)**: `max_num_seqs (256) exceeds available Mamba cache
+  blocks (89)`로 엔진 초기화에 실패해, `max_num_seqs` 64로 다시 돌렸다.
+
+`max_tokens=1`이라 시퀀스가 한 스텝에 끝나므로 `max_num_seqs`를 낮춰도 손해가 작다는 것이
+당시 판단이었다. 처리 시간을 비교해 확인하지는 않았다.
 
 ## Sampling 설정 (`SamplingParams`)
 
@@ -122,12 +173,10 @@ system 프롬프트는 따로 넣지 않으며, 모델 템플릿이 기본으로
 - 실제로 모델에 들어간 프롬프트 한 개를 디코딩한 문자열이 이후 run의 `meta.json`
   `sample_prompt`에 남아 있다.
 
-## 실행 기록으로 확인되는 것
+## 엔진 상태 예시 (레포에 커밋된 로그)
 
-엔진 로그가 레포에 남아 있는 것은 2026-07-25 래더의 **원 조건 Qwen2.5 0.5B, 1.5B, 3B**
-세 run뿐이다(`results/serving_logs/ladder_20260725_195436/`). 로그의 `non-default args`에
-`gpu_memory_utilization`, `tensor_parallel_size`, `max_num_seqs`가 없다는 것은 셋 다
-vLLM 기본값(0.9, 1, 기본값)으로 돌았다는 뜻이고, 이는 yaml 값과 일치한다.
+레포에 전체 로그가 커밋된 것은 2026-07-25 래더의 원 조건 Qwen2.5 0.5B, 1.5B, 3B 세 run이다
+(`results/serving_logs/ladder_20260725_195436/`). 이 로그에서는 인자 외의 엔진 상태도 볼 수 있다.
 
 | 항목 | Qwen2.5-0.5B | Qwen2.5-1.5B | Qwen2.5-3B |
 |---|---|---|---|
@@ -147,12 +196,12 @@ vLLM 기본값(0.9, 1, 기본값)으로 돌았다는 뜻이고, 이는 yaml 값�
 단위의 순간 추정치라 전체 처리량이나 지연 시간 측정으로 쓸 수 없다. throughput과 latency는
 측정하지 않았다.
 
-## 기록 없음
+## 기록 없음, 측정하지 않음
 
 | 항목 | 상태 |
 |---|---|
-| 로그도 세션 권장도 없는 run(원 조건 Qwen2.5-7B, Llama 3종, Ministral 3종, gemma-4 3종, gpt-oss-20b, 강제 선택 조건 24개 전부)의 실제 엔진 인자 | 기록 없음. yaml 값은 스크립트 기본값이며 env로 override했는지 알 수 없다 |
-| Qwen2.5 0.5B, 1.5B, 3B 외 run의 vLLM 버전 | 기록 없음. 세션에는 Llama 3.2(transformers 5 호환)와 Qwen3.5(Gated DeltaNet 지원) 때문에 vLLM을 올려야 할 수 있다는 논의만 있고, 실제로 올렸는지와 버전 번호는 남아 있지 않다 |
-| Qwen3.5-9B 강제 선택 조건 재실행 설정 | 첫 실행은 엔진 초기화에서 실패(GDN/Mamba 캐시 블록 부족, 커밋 21b45f9)하고 재실행되었으나 바꾼 설정은 기록 없음 |
-| 체크포인트 자체의 가중치 형식을 엔진이 어떻게 적용했는지 | quantization 인자는 넘기지 않았고, 로그가 없는 모델은 엔진이 실제로 적용한 형식이 기록 없음 |
+| 원 조건 Qwen2.5-7B의 vLLM 버전과 엔진 상태 | 기록 없음 (래더 밖에서 수동 실행) |
+| 레포에 커밋되지 않은 서버 로그의 엔진 상태(KV cache 크기, 초기화 시간 등) | 서버에만 있다. 이 문서에는 인자와 버전만 옮겼다 |
+| vLLM 0.26.0이 깔린 환경 | 서버의 conda env `bbq`에는 현재 vLLM 0.10.2(transformers 4.57.6, torch 2.8.0+cu128)가 있다. 0.26.0으로 돌린 run이 어느 환경을 썼는지는 기록 없음 |
+| 조건 사이 vLLM 버전, TP 차이가 logprob에 주는 영향 | 확인하지 않았다 |
 | throughput, latency, GPU 메모리 사용량 | 측정하지 않았다 |
