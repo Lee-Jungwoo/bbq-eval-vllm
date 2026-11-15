@@ -60,6 +60,8 @@ from tokenizer_checker import choose_label_tokens
 
 PIPELINE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = PIPELINE_DIR.parent
+# Upstream NYU BBQ files (data/*.jsonl, analysis_scripts/additional_metadata.csv).
+BBQ_ROOT = REPO_ROOT / "third_party" / "bbq"
 RUNS_DIR = PIPELINE_DIR / "runs_binary"
 
 # Deliberately word-for-word the 3-option prompt with "three"->"two" and the
@@ -119,7 +121,7 @@ def build_instances(config, categories, target_locs):
     missing_metadata = 0
     skipped_no_unknown = []
     for category in categories:
-        data_path = REPO_ROOT / "data" / f"{category}.jsonl"
+        data_path = BBQ_ROOT / "data" / f"{category}.jsonl"
         max_qidx = max_question_index_for(config, category)
         with open(data_path, encoding="utf-8") as f:
             for line in f:
@@ -226,7 +228,7 @@ def cmd_prepare(config, run_dir):
         print(f"[prepare] assistant prefill: {prefill!r} (ids={prefill_ids})")
 
     revision_sha = resolve_revision_sha(model, config["revision"])
-    target_locs = load_target_locs(REPO_ROOT / "analysis_scripts" / "additional_metadata.csv")
+    target_locs = load_target_locs(BBQ_ROOT / "analysis_scripts" / "additional_metadata.csv")
     instances = build_instances(config, categories, target_locs)
     print(f"[prepare] {len(instances)} instances "
           f"({sum(1 for i in instances if i['context_condition'] == 'ambig')} ambig, "
