@@ -1,7 +1,8 @@
 # vLLM serving config for Qwen/Qwen3-4B
 # Read by scripts/serve.py, which turns it into src/bbq_eval/serve_logprobs.py flags.
-# Values are copied from the code defaults that drove the runs; see `provenance`
-# for which of them a run log actually confirms.
+# Values are the code defaults that drove the runs, or, where provenance has a
+# session_recommendation, the command recommended then. provenance says which
+# values a run log actually confirms.
 
 model: "Qwen/Qwen3-4B"
 revision: "1cfa9a7208912126459214e8b04321603b3df60c"   # pinned sha, from results/runs/*/meta.json
@@ -11,8 +12,8 @@ engine:                         # keyword arguments of vllm.LLM(...)
   dtype: bfloat16
   max_model_len: 1024           # longest original-condition prompt: 222 tokens
   gpu_memory_utilization: 0.90
-  tensor_parallel_size: 1
-  max_num_seqs: null            # null: flag not passed, vLLM's own default
+  tensor_parallel_size: 2
+  max_num_seqs: 64                # session recommendation, see provenance
   limit_images: null            # null: flag not passed (text-only model)
   quantization: null            # serve_logprobs.py has no quantization flag; never passed
 
@@ -22,8 +23,8 @@ runner:                         # serve_logprobs.py's own flags
   max_tokens: 1                 # first-token logprobs only (temperature=1.0, top_p=1.0)
 
 hardware:
-  cuda_visible_devices: "1"     # run_ladder.sh default GPU=1 (CUDA_DEVICE_ORDER=PCI_BUS_ID)
-  gpu: null                     # GPU model: not recorded
+  cuda_visible_devices: "0,1"     # GPU=0,1 for run_ladder.sh (CUDA_DEVICE_ORDER=PCI_BUS_ID)
+  gpu: "NVIDIA GeForce RTX 3090 24GB"   # lab server has 2; reported by the user (2026-11-15) and in session 54c52366
 
 provenance:
   original_run: Qwen3-4B_bfloat16_991e3e9b
@@ -31,6 +32,12 @@ provenance:
   vllm_version: null              # not recorded
   log: null
   confirmed_by_log: []
-    # No run log for this model. Every engine/runner value above is the
-    # scripts/run_ladder.sh (or serve_logprobs.py) default; whether it was
-    # overridden through env vars at run time is not recorded.
+    # No run log. tensor_parallel_size, max_num_seqs, max_model_len and
+    # cuda_visible_devices follow the command Claude recommended in a local
+    # Claude Code session; the user states the runs followed those
+    # recommendations. Applies to the original-condition run; the
+    # forced-choice run (2026-08-18/19) has no record. Other values are defaults.
+  session_recommendation:
+    session: 54c52366 (Claude Code, 2026-07-27/28)
+    when: "2026-07-28 03:26 and 03:42"
+    command: "GPU=0,1 MAX_NUM_SEQS=64 ./run_ladder.sh Qwen/Qwen3-0.6B Qwen/Qwen3-1.7B Qwen/Qwen3-4B Qwen/Qwen3-8B Qwen/Qwen3-14B"
