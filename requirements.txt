@@ -1,0 +1,16 @@
+# Local side: prepare, collect, aggregate, publish, scripts/*.
+# Versions are not pinned because the runs did not record them; the dry-run and
+# publish checks in this repo were last run with pandas 3.1, numpy 2.x, transformers 5.23.
+pandas>=2.2
+numpy>=1.26
+transformers
+huggingface_hub
+pyyaml
+# Mistral checkpoints: install this so AutoTokenizer picks the same backend vLLM uses
+# (see docs/pipeline.md, "Vision-capable models").
+# mistral_common
+
+# GPU server side, installed separately: vllm (+ pyyaml for scripts/serve.py).
+# The only version recorded in the logs is vllm 0.10.2 (Qwen2.5 runs, 2026-07-25).
+
+# Streamlit app: app/requirements.txt
