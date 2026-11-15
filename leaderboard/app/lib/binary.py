@@ -49,21 +49,21 @@ RUNS_DIR = Path(__file__).resolve().parents[3] / "bbq_pipeline" / "runs_binary"
 #: meaning in this arm, since the gold answer there is one of the two groups.
 GATE = 0.70
 
-#: Column set for `table.render`. `acc_amb` is absent by construction — see the
-#: module docstring. Widths sum with the 58px rank column the way `table.COLUMNS`
-#: does; the 6% freed by dropping `acc_amb` goes to the two bias bars.
+#: Column set for `table.render`, in the same words the 3-option board uses.
+#: `"모르겠다" 비율` is absent by construction — see the module docstring. Widths
+#: sum with the 58px rank column the way `table.COLUMNS` does; the share freed by
+#: dropping that column goes to the two bias bars.
 COLUMNS: tuple[tuple[str, str, bool, str, str, str], ...] = (
-    ("#",         "rank",              True,  "58px", "",      "rank"),
-    ("Model",     "model_short",       True,  "28%",  "",      "model"),
-    ("Bias B(m)", "B",                 True,  "9%",   "",      "bias"),
-    ("95% CI",    "B_lo",              True,  "13%",  "",      "ci"),
-    ("s_DIS",     "s_DIS",             False, "22%",  "",      "diverge"),
-    ("s_AMB",     "s_AMB",             False, "22%",  "",      "diverge"),
-    ("acc_dis",   "accuracy_disambig", False, "6%",   "right", "acc_gate"),
+    ("#",                            "rank",              True,  "58px", "",      "rank"),
+    ("모델",                          "model_short",       True,  "26%",  "",      "model"),
+    ("편향 점수\n0에 가까울수록 공정",     "B",                 True,  "10%",  "",      "bias"),
+    ("95% 신뢰구간",                   "B_lo",              True,  "12%",  "",      "ci"),
+    ("정보가 있을 때 편향\n주황 = 고정관념 쪽", "s_DIS",         False, "21%",  "",      "diverge"),
+    ("정보가 없을 때 편향\n주황 = 고정관념 쪽", "s_AMB",         False, "21%",  "",      "diverge"),
+    ("기본 실력\n정답률",               "accuracy_disambig", False, "10%",  "right", "acc_gate"),
 )
 
-SORT_OPTIONS: dict[str, tuple[str, bool]] = {
-    label: (column, ascending) for label, column, ascending, _, _, _ in COLUMNS}
+SORT_OPTIONS: dict[str, tuple[str, bool]] = table.sort_options(COLUMNS)
 
 #: Flat metric columns lifted out of `summary.json`'s `overall` block.
 _METRICS = ("B", "B_lo", "B_hi", "s_DIS", "s_AMB", "accuracy_disambig",

@@ -32,6 +32,34 @@ Install the UI dependencies once: `pip install -r leaderboard/requirements.txt`.
 | `1_Model_detail`, `2_Scaling_curves` | `bbq.sqlite` | one run / a size ladder, not a ranking |
 | `3_External_leaderboard` | `external/bbq_external.csv` | results published by other people, one source at a time |
 | `4_Binary_leaderboard` | `bbq_pipeline/runs_binary/*/summary.json` | the A/B arm, with no "unknown" option |
+| `5_Arm_comparison` | **both** of the above | the same models ranked in each arm, side by side, with the rank change |
+
+## Comparing the two arms
+
+`5_Arm_comparison` is the only page that reads both sources. It joins the two
+boards on `model_short` and shows each model's rank in each arm with the change
+between them. `lib/compare.py` does the join; it defines no metric of its own, so
+it cannot drift from either board.
+
+The move lives in one table cell (`table.py`'s `rankshift` renderer) rather than
+in a chart beside the table: a slope chart of two dozen models is a braid, and
+every row's track spans the same 1..N field, so reading the column top to bottom
+already ranks the models by how far they moved. Model family is a sidebar filter,
+the way it is on Home — not a grouping in the table, which shows the full ranking.
+
+Two things it does deliberately:
+
+- **It recomputes the ranks** instead of showing the two published ones. A rank
+  is only meaningful within a fixed field, and the arms do not gate out the same
+  models — carrying either board's rank across would let a model that is absent
+  or gated on one side shift every rank below it and manufacture movement that is
+  not there. Only models eligible in *both* arms are ranked.
+- **It offers three ranking bases**, because `B(m)` is not the same quantity on
+  the two sides. `B*` = `|s_DIS| + |s_AMB unscaled|` takes the 3-option arm's
+  abstention scaling back out and is the like-for-like ordering — it is the
+  default. Ranking by the two boards' published `B(m)` is available too, and moves
+  models much further (mean 6.7 places vs 4.1 across the current 20-model field),
+  because a large part of that movement is abstention rather than bias.
 
 ## The binary (A/B) board
 

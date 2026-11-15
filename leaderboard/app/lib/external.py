@@ -30,33 +30,33 @@ GATE = 0.7
 #: actually publishes — an accuracy-only card should not show four em-dash
 #: columns where the bias scores would be.
 COLS_BIAS = (
-    ("#",         "rank",              True,  "58px", "",      "rank"),
-    ("Model",     "model_short",       True,  "34%",  "",      "model"),
-    ("Bias B(m)", "B",                 True,  "10%",  "",      "bias"),
-    ("s_DIS",     "s_DIS",             False, "22%",  "",      "diverge"),
-    ("s_AMB",     "s_AMB",             False, "22%",  "",      "diverge"),
-    ("acc_dis",   "accuracy_disambig", False, "6%",   "right", "acc_gate"),
-    ("acc_amb",   "accuracy_ambig",    False, "6%",   "right", "acc"),
+    ("#",                            "rank",              True,  "58px", "",      "rank"),
+    ("모델",                          "model_short",       True,  "30%",  "",      "model"),
+    ("편향 점수\n0에 가까울수록 공정",     "B",                 True,  "12%",  "",      "bias"),
+    ("정보가 있을 때 편향",             "s_DIS",             False, "20%",  "",      "diverge"),
+    ("정보가 없을 때 편향",             "s_AMB",             False, "20%",  "",      "diverge"),
+    ("기본 실력\n정답률",               "accuracy_disambig", False, "9%",   "right", "acc_gate"),
+    ('"모르겠다" 비율',                 "accuracy_ambig",    False, "9%",   "right", "acc"),
 )
 
 COLS_ACC = (
-    ("#",       "rank",              True,  "58px", "",      "rank"),
-    ("Model",   "model_short",       True,  "56%",  "",      "model"),
-    ("acc_amb", "accuracy_ambig",    False, "14%",  "right", "acc"),
-    ("acc_dis", "accuracy_disambig", False, "14%",  "right", "acc"),
+    ("#",                 "rank",              True,  "58px", "",      "rank"),
+    ("모델",               "model_short",       True,  "52%",  "",      "model"),
+    ('"모르겠다" 비율',      "accuracy_ambig",    False, "16%",  "right", "acc"),
+    ("기본 실력\n정답률",    "accuracy_disambig", False, "16%",  "right", "acc"),
 )
 
 COLS_ACC_P = COLS_ACC[:2] + (
-    ("acc_amb",           "accuracy_ambig",         False, "12%", "right", "acc"),
-    ("acc_dis",           "accuracy_disambig",      False, "12%", "right", "acc"),
-    ("P(not-stereotype)", "p_not_stereotype_ambig", True,  "16%", "right", "num"),
+    ('"모르겠다" 비율',            "accuracy_ambig",         False, "13%", "right", "acc"),
+    ("기본 실력\n정답률",          "accuracy_disambig",      False, "13%", "right", "acc"),
+    ("고정관념을 피한 비율",        "p_not_stereotype_ambig", True,  "18%", "right", "num"),
 )
 
 COLS_HELM = (
-    ("#",        "rank",             True,  "58px", "",      "rank"),
-    ("Model",    "model_short",      True,  "46%",  "",      "model"),
-    ("s_AMB",    "s_AMB",            False, "34%",  "",      "diverge"),
-    ("accuracy", "accuracy_overall", False, "14%",  "right", "acc"),
+    ("#",                  "rank",             True,  "58px", "",      "rank"),
+    ("모델",                "model_short",      True,  "42%",  "",      "model"),
+    ("정보가 없을 때 편향",   "s_AMB",            False, "34%",  "",      "diverge"),
+    ("정답률",              "accuracy_overall", False, "16%",  "right", "acc"),
 )
 
 

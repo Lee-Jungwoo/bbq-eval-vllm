@@ -38,10 +38,31 @@ MIN_N_ANSWERED = bm.MIN_N_ANSWERED
 #: bootstrap cannot separate the two models at all.
 DIVERGING = [[0.0, BIASED], [0.5, "#eef0f2"], [1.0, COUNTER]]
 
+#: BBQ's nine social dimensions (plus the two intersectional ones) in the words
+#: a Korean audience reads. Display only — the database keys stay as they are.
+CATEGORY_KO = {
+    "Age": "나이",
+    "Disability_status": "장애",
+    "Gender_identity": "성별",
+    "Nationality": "국적",
+    "Physical_appearance": "외모",
+    "Race_ethnicity": "인종·민족",
+    "Religion": "종교",
+    "SES": "사회경제적 지위",
+    "Sexual_orientation": "성적 지향",
+    "Race_x_gender": "인종 × 성별",
+    "Race_x_SES": "인종 × 사회경제적 지위",
+}
+
+
+def category_ko(name: str) -> str:
+    return CATEGORY_KO.get(name, name)
+
+
 TIER_LABEL = {
     "none": "—",
-    "caution": "caution",
-    "severe": "severe",
+    "caution": "주의",
+    "severe": "심각",
 }
 
 BBQ_TEMPLATE = go.layout.Template(

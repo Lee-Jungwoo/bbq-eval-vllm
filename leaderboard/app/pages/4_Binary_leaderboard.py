@@ -10,40 +10,36 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from lib import binary, charts
+from lib import binary, charts, explain
+from lib import theme as t
 
 st.set_page_config(page_title="BBQ binary leaderboard", page_icon="⚖️",
                    layout="wide")
 binary.require_runs()
 
-st.title("BBQ bias leaderboard · binary (A/B)")
-
-st.info(
-    "이 표의 모든 항목은 **선택지가 두 개**입니다 — 모호한 맥락에서도 "
-    "“unknown”(Not enough info / Cannot be determined …) 선택지를 없애고 두 집단 "
-    "중 하나를 고르도록 강제했습니다. 그래서 모델은 기권할 수 없습니다.\n\n"
-    "**Home(3-옵션)과 순위를 섞지 마세요.** 여기의 `s_AMB` 는 "
-    "`(1 − accuracy_ambig)` 스케일링이 없는 값이라, Home 의 `s_AMB` 가 아니라 "
-    "`s_AMB unscaled` 와 비교해야 합니다.")
+explain.page_header(
+    "“모르겠다”를 없애면 무엇이 드러나는가",
+    "같은 문항에서 <b>“알 수 없음” 선택지를 지우고</b> 두 집단 중 하나를 반드시 "
+    "고르게 했습니다. 이제 어떤 모델도 회피할 수 없습니다.")
 
 groups = binary.groups()
 labels = {row.comparability_key: f"{row.comparability_key} · {row.n_runs} runs · "
                                 f"{int(row.n_instances):,} items"
           for row in groups.itertuples(index=False)}
 
+# Same rule as the 3-option board: only runs that answered the same questions
+# under the same prompt may be ranked against each other — and, as there, it is
+# not a choice worth putting in front of a reader.
+keys = list(labels)
 with st.sidebar:
-    st.header("View")
-    # Same rule as the 3-option board: only runs that answered the same
-    # questions under the same prompt may be ranked against each other.
-    key = st.selectbox("Comparability group", list(labels),
-                       format_func=lambda k: labels[k],
-                       help="sha256(prompt_hash | categories | n_instances). "
-                            "binary arm 의 prompt_hash 는 3-옵션과 다르므로 "
-                            "두 arm 의 런이 같은 그룹에 들어가는 일은 없습니다.")
-    show_ineligible = st.checkbox("Show runs below the accuracy gate", value=True)
-    families = st.multiselect("Model family", sorted(binary.runs()["family"].unique()),
-                              default=None, placeholder="all families")
-    sort_by = st.selectbox("Sort by", list(binary.SORT_OPTIONS))
+    with st.expander("표 설정", expanded=False):
+        key = keys[0] if len(keys) == 1 else st.selectbox(
+            "비교 가능 묶음", keys, format_func=lambda k: labels[k])
+        families = st.multiselect("모델 계열",
+                                  sorted(binary.runs()["family"].unique()),
+                                  default=None, placeholder="전체")
+        sort_by = st.selectbox("정렬 기준", list(binary.SORT_OPTIONS))
+        show_ineligible = st.checkbox("정답률이 낮아 제외된 모델도 표시", value=True)
 
 board = binary.board(key)
 if families:
@@ -51,7 +47,7 @@ if families:
 if not show_ineligible:
     board = board[board["eligible"] == 1]
 if board.empty:
-    st.warning("No runs match the current filters.")
+    st.warning("조건에 맞는 모델이 없습니다.")
     st.stop()
 
 n_ranked = int((board["eligible"] == 1).sum())
@@ -62,114 +58,126 @@ board = board.sort_values(["eligible", sort_column], ascending=[False, ascending
 
 st.html(binary.render(board))
 st.caption(
-    f"Bias B(m)은 낮을수록 편향이 작습니다. 막대 색: 주황 = 고정관념 방향, "
-    f"파랑 = 반(反)고정관념 방향. 정확도 게이트는 `accuracy_disambig` ≥ "
-    f"{binary.GATE:.2f} 이며 {n_ranked}개 런이 순위에 들어갔습니다. "
-    f"`accuracy_ambig` 열은 없습니다 — unknown 을 없애면 모호한 맥락에는 정답이 "
-    f"존재하지 않습니다.")
+    f"막대 색: **주황 = 고정관념 방향**, **파랑 = 반대 방향**. 기본 실력이 "
+    f"{binary.GATE:.0%}에 못 미치는 모델은 순위에서 빼, {n_ranked}개가 순위에 "
+    f"들어갔습니다. <strong>“모르겠다” 비율 열은 없습니다</strong> — 선택지를 "
+    f"지웠으니 정보가 없는 문항에는 정답 자체가 존재하지 않습니다.",
+    unsafe_allow_html=True)
 
 # --- what this arm measures instead of abstention ---------------------------
 with st.expander("전체 수치", expanded=False):
     st.markdown(
-        "`target_rate` 는 고정관념 집단을 지목한 비율입니다. `neg` 항목에서는 "
-        "`(s+1)/2`, `nonneg` 항목에서는 그 거울상 `(1−s)/2` 이므로 고정관념 방향으로 "
-        "일관된 모델은 **합산 0.5 근처**에 놓입니다. 합산값이 0.5에서 크게 벗어나면 "
-        "질문의 극성과 **무관하게** 특정 집단을 더(또는 덜) 지목한다는 뜻이고, "
-        "이는 `s_DIS`/`s_AMB` 로는 보이지 않습니다. `A rate` 는 위치 편향 점검용으로, "
-        "BBQ 는 항목마다 선택지 순서를 무작위화하므로 0.5에서 벗어나면 모델 쪽 "
-        "성향입니다.")
+        "**고정관념 집단을 고른 비율**은 부정 질문(`neg`)과 그 거울상인 긍정 "
+        "질문(`nonneg`)이 서로 반대 방향이라, 고정관념 방향으로 일관된 모델은 "
+        "둘을 합치면 **0.5 근처**에 놓입니다. 합산값이 0.5에서 크게 벗어나면 질문의 "
+        "방향과 **무관하게** 특정 집단을 더(또는 덜) 지목한다는 뜻이고, 이는 편향 "
+        "점수로는 보이지 않습니다. **A만 고르는 습관**은 위치 편향 점검용입니다 — "
+        "BBQ 는 문항마다 선택지 순서를 섞으므로 0.5에서 벗어나면 모델 쪽 성향입니다.")
     view = pd.DataFrame({
-        "rank": board["rank"],
-        "model": board["model_short"],
-        "B": board["B"],
-        "B 95% CI": [f"[{lo:.4f}, {hi:.4f}]" if pd.notna(lo) and pd.notna(hi) else "—"
+        "순위": board["rank"],
+        "모델": board["model_short"],
+        "편향 점수": board["B"],
+        "95% 신뢰구간": [f"[{lo:.4f}, {hi:.4f}]" if pd.notna(lo) and pd.notna(hi) else "—"
                      for lo, hi in zip(board["B_lo"], board["B_hi"])],
-        "s_DIS": board["s_DIS"],
-        "s_AMB": board["s_AMB"],
-        "acc_dis": board["accuracy_disambig"],
-        "target_rate (amb)": board["target_rate_ambig"],
-        "target_rate (dis)": board["target_rate_disambig"],
-        "target_rate amb·neg": board["target_rate_ambig_neg"],
-        "target_rate amb·nonneg": board["target_rate_ambig_nonneg"],
-        "A rate": board["letter_A_rate"],
-        "prob mass (A+B)": board["mean_prob_mass_captured"],
-        "n": board["n"],
+        "정보가 있을 때 편향": board["s_DIS"],
+        "정보가 없을 때 편향": board["s_AMB"],
+        "기본 실력": board["accuracy_disambig"],
+        "고정관념 집단을 고른 비율 (정보 없음)": board["target_rate_ambig"],
+        "고정관념 집단을 고른 비율 (정보 있음)": board["target_rate_disambig"],
+        "  └ 부정 질문만": board["target_rate_ambig_neg"],
+        "  └ 긍정 질문만": board["target_rate_ambig_nonneg"],
+        "A만 고르는 습관": board["letter_A_rate"],
+        "확률 질량 (A+B)": board["mean_prob_mass_captured"],
+        "문항 수": board["n"],
     })
     st.dataframe(
         view, hide_index=True, width="stretch",
         column_config={
-            "rank": st.column_config.NumberColumn(format="%d", alignment="left"),
-            "B": st.column_config.NumberColumn(format="%.4f", alignment="left"),
-            "s_DIS": st.column_config.NumberColumn(format="%+.4f", alignment="left"),
-            "s_AMB": st.column_config.NumberColumn(
+            "순위": st.column_config.NumberColumn(format="%d", alignment="left"),
+            "편향 점수": st.column_config.NumberColumn(format="%.4f", alignment="left"),
+            "정보가 있을 때 편향": st.column_config.NumberColumn(
+                format="%+.4f", alignment="left"),
+            "정보가 없을 때 편향": st.column_config.NumberColumn(
                 format="%+.4f", alignment="left",
-                help="스케일링 없는 값. Home 의 s_AMB unscaled 와 같은 층위입니다."),
-            "acc_dis": st.column_config.NumberColumn(format="%.3f", alignment="left"),
-            "target_rate (amb)": st.column_config.NumberColumn(
+                help="회피가 불가능하므로 스케일링이 없습니다. 3지선다 쪽의 "
+                     "“굳이 답할 때 편향”과 같은 층위입니다."),
+            "기본 실력": st.column_config.NumberColumn(format="%.3f", alignment="left"),
+            "고정관념 집단을 고른 비율 (정보 없음)": st.column_config.NumberColumn(
                 format="%.3f", alignment="left",
-                help="모호한 맥락에서 고정관념 집단을 지목한 비율."),
-            "target_rate (dis)": st.column_config.NumberColumn(
+                help="맥락에 단서가 없는데도 고정관념 집단을 지목한 비율."),
+            "고정관념 집단을 고른 비율 (정보 있음)": st.column_config.NumberColumn(
                 format="%.3f", alignment="left"),
-            "target_rate amb·neg": st.column_config.NumberColumn(
+            "  └ 부정 질문만": st.column_config.NumberColumn(
                 format="%.3f", alignment="left",
-                help="부정 질문(neg)만. (s_AMB + 1) / 2 와 같습니다."),
-            "target_rate amb·nonneg": st.column_config.NumberColumn(
+                help="부정적인 고정관념을 묻는 질문만 모은 값."),
+            "  └ 긍정 질문만": st.column_config.NumberColumn(
                 format="%.3f", alignment="left",
-                help="긍정 질문(nonneg)만. 거울상이라 neg 와 합쳐지면 0.5 근처가 됩니다."),
-            "A rate": st.column_config.NumberColumn(
+                help="그 거울상. 부정 질문과 합치면 0.5 근처가 되는 것이 정상입니다."),
+            "A만 고르는 습관": st.column_config.NumberColumn(
                 format="%.3f", alignment="left",
                 help="A 선택률. 0.5 = 위치 선호 없음."),
-            "prob mass (A+B)": st.column_config.NumberColumn(
+            "확률 질량 (A+B)": st.column_config.NumberColumn(
                 format="%.3f", alignment="left",
-                help="라벨 토큰 두 개에 실린 확률 질량. 3-옵션 런보다 약간 낮은 것이 정상."),
-            "n": st.column_config.NumberColumn(format="%d", alignment="left"),
+                help="두 선택지 토큰에 실린 확률. 3지선다보다 약간 낮은 것이 정상."),
+            "문항 수": st.column_config.NumberColumn(format="%d", alignment="left"),
         })
 
 st.plotly_chart(binary.bias_dotplot(board), width="stretch")
 
 # --- bias-score definition, as it actually is in this arm -------------------
-st.markdown("### Bias 계산식 (binary arm)")
-st.markdown(
+formula = st.expander("편향 점수는 어떻게 계산하나 (수식)", expanded=False)
+formula.markdown(
     "$p_c$는 각 맥락 조건 $c$에서 biased 응답의 비율입니다. unknown 선택지가 없으므로 "
     "모든 응답이 분모에 들어가고, 제외되는 것은 `target_loc` 메타데이터가 없는 "
     "~16개 항목뿐입니다.")
-st.latex(r"p_c = \frac{n_{\mathrm{biased},c}}{n_c},"
-         r"\qquad s_{\mathrm{raw},c} = 2p_c - 1")
-st.latex(r"s_{\mathrm{DIS}} = s_{\mathrm{raw,disambiguated}},"
-         r"\qquad s_{\mathrm{AMB}} = s_{\mathrm{raw,ambiguous}}")
-st.latex(r"{Bias} = |s_{\mathrm{DIS}}| + |s_{\mathrm{AMB}}|")
-st.caption(
+formula.latex(r"p_c = \frac{n_{\mathrm{biased},c}}{n_c},"
+              r"\qquad s_{\mathrm{raw},c} = 2p_c - 1")
+formula.latex(r"s_{\mathrm{DIS}} = s_{\mathrm{raw,disambiguated}},"
+              r"\qquad s_{\mathrm{AMB}} = s_{\mathrm{raw,ambiguous}}")
+formula.latex(r"{Bias} = |s_{\mathrm{DIS}}| + |s_{\mathrm{AMB}}|")
+formula.caption(
     "3-옵션 arm 의 $s_{AMB} = (1 - \\mathrm{accuracy_{ambiguous}})\\,s_{raw,ambiguous}$ "
     "와 비교하세요. 그 스케일링 항은 “모델이 올바르게 기권한 비율만큼 편향을 "
     "할인”하는 것인데, 기권이 불가능한 이 arm 에서는 정의되지 않으므로 빠집니다.")
 
 # --- per-category view ------------------------------------------------------
-with st.expander("카테고리별 점수", expanded=False):
-    picked = st.selectbox("Run", board["model_short"].tolist())
+with st.expander("속성별 점수", expanded=False):
+    picked = st.selectbox("모델", board["model_short"].tolist())
     run_id = board.loc[board["model_short"] == picked, "run_id"].iloc[0]
     by_category = binary.per_category(run_id)
+    if not by_category.empty:
+        by_category = by_category.assign(
+            scope_value=by_category["scope_value"].map(t.category_ko))
     if by_category.empty:
-        st.info("이 런의 summary.json 에는 카테고리별 블록이 없습니다.")
+        st.info("이 런에는 속성별 수치가 없습니다.")
     else:
         left, right = st.columns(2)
         with left:
             st.plotly_chart(charts.category_bars(
-                by_category, ("s_AMB", "s_DIS"), ("s_AMB", "s_DIS"),
-                "Bias score by category  (+ = toward the stereotype)",
-                hline=0.0, xaxis_title="bias score"), width="stretch")
+                by_category, ("s_AMB", "s_DIS"), ("정보 없을 때", "정보 있을 때"),
+                "속성별 편향 점수  (+ = 고정관념 방향)",
+                hline=0.0, xaxis_title="편향 점수"), width="stretch")
         with right:
             st.plotly_chart(charts.category_bars(
                 by_category, ("target_rate_ambig", "target_rate_disambig"),
-                ("ambiguous", "disambiguated"),
-                "고정관념 집단 지목률 by category",
-                hline=0.5, hline_label="0.5", xaxis_title="target_rate"),
+                ("정보 없음", "정보 있음"),
+                "속성별 고정관념 집단을 고른 비율",
+                hline=0.5, hline_label="0.5", xaxis_title="비율"),
                 width="stretch")
         st.dataframe(
             by_category[[c for c in ("scope_value", "n", "accuracy_disambig",
                                      "s_AMB", "s_DIS", "target_rate_ambig",
                                      "target_rate_disambig", "letter_A_rate")
                          if c in by_category]]
-            .rename(columns={"scope_value": "category"}),
+            .rename(columns={
+                "scope_value": "속성",
+                "n": "문항 수",
+                "accuracy_disambig": "기본 실력",
+                "s_AMB": "정보가 없을 때 편향",
+                "s_DIS": "정보가 있을 때 편향",
+                "target_rate_ambig": "고정관념 선택률 (정보 없음)",
+                "target_rate_disambig": "고정관념 선택률 (정보 있음)",
+                "letter_A_rate": "A만 고르는 습관"}),
             hide_index=True, width="stretch")
 
 st.caption(

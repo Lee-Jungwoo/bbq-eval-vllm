@@ -9,13 +9,16 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from lib import external
+from lib import explain, external
 
 st.set_page_config(page_title="External BBQ leaderboard", page_icon="🌐",
                    layout="wide")
 external.require_csv()
 
-st.title("외부 공개 BBQ 결과")
+explain.page_header(
+    "공개된 남의 결과와 비교하면?",
+    "출처마다 프롬프트도 채점 방식도 달라 <b>서로 비교할 수 없습니다</b>. "
+    "그래서 같은 조건으로 직접 쟀습니다 — 그 결과가 첫 페이지입니다.")
 
 # --- the table switch, directly under the title ----------------------------
 boards = external.boards()
@@ -38,20 +41,20 @@ st.caption(external.caption(board))
 # --- what this particular source can and cannot tell you --------------------
 if board.has_bias:
     st.success(
-        "이 표의 `s_DIS` / `s_AMB`는 `bbq_metrics.py`와 **같은 정의**입니다. "
-        "Bias B(m)로 순위를 매길 수 있는 유일한 외부 출처입니다. "
-        "다만 프롬프트 형식과 채점 경로는 공개되지 않았습니다.")
+        "이 표의 편향 점수는 우리와 **같은 정의**로 계산된 값입니다 — 순위를 매길 수 "
+        "있는 유일한 외부 출처입니다. 다만 프롬프트 형식과 채점 경로는 공개되지 "
+        "않았습니다.")
 elif source_id.startswith("helm"):
     st.error(
-        "**HELM의 `s_DIS`는 측정값이 아니라 상수 아티팩트라 이 표에서 제외했습니다.** "
-        "HELM의 target 매칭이 리스트 원소 완전일치라 BBQ 항목의 36.2%에서 "
-        "target을 찾지 못하고, 그 항목들이 분모에만 들어가 모든 모델을 "
-        "−0.19…−0.24로 밀어냅니다. 남긴 `s_AMB`도 같은 이유로 0쪽으로 눌린 "
-        "하한값입니다. 근거는 `external/README.md`에 있습니다.")
+        "**HELM 의 “정보가 있을 때 편향”은 측정값이 아니라 계산 오류라 뺐습니다.** "
+        "HELM 은 BBQ 항목의 36.2%에서 고정관념 대상을 찾지 못하는데 그 항목들이 "
+        "분모에만 들어가, 모든 모델이 −0.19…−0.24 로 똑같이 밀립니다. 남긴 "
+        "“정보가 없을 때 편향”도 같은 이유로 0쪽으로 눌린 하한값입니다. "
+        "근거는 `external/README.md` 에 있습니다.")
 else:
     st.info(
-        "이 출처는 **정확도만** 공개합니다. 편향 점수가 없으므로 B(m) 순위를 "
-        "매길 수 없고, 위 순위는 `accuracy_disambig` 내림차순일 뿐입니다.")
+        "이 출처는 **정답률만** 공개합니다. 편향 점수가 없으므로 순위를 매길 수 "
+        "없고, 위 순서는 기본 실력(정답률) 내림차순일 뿐입니다.")
 
 if source_id.startswith("openai_syscard"):
     st.warning(
@@ -68,11 +71,11 @@ if board.has_bias:
     if not top.empty:
         row = top.iloc[0]
         st.caption(
-            f"**{row['model_short']}**가 B = {row['B']:.4f}로 1위지만, "
-            f"모호한 맥락의 정답은 “unknown”이라 `accuracy_ambig` = "
-            f"{row['accuracy_ambig']:.3f}는 사실상 기권율입니다. 이 점수를 "
-            f"의미 있게 만드는 건 `accuracy_disambig` = "
-            f"{row['accuracy_disambig']:.3f}이고, 게이트는 {external.GATE}입니다.")
+            f"**{row['model_short']}** 가 편향 점수 {row['B']:.4f} 로 1위지만, "
+            f"정보가 없는 문항의 정답이 곧 “모르겠다”라 그 정답률 "
+            f"{row['accuracy_ambig']:.1%} 는 사실상 회피율입니다. 이 점수를 "
+            f"의미 있게 만드는 건 기본 실력 {row['accuracy_disambig']:.1%} 이고, "
+            f"기준선은 {external.GATE:.0%} 입니다.")
 
 # --- provenance -------------------------------------------------------------
 meta = board.meta
@@ -98,9 +101,9 @@ with st.expander("출처 · 원본 수치", expanded=False):
         hide_index=True, width="stretch")
 
 st.caption(
-    "이 페이지의 어떤 숫자도 `bbq_pipeline/`에서 측정한 것이 아닙니다. "
-    "직접 돌린 결과는 **Home**에 있고, 두 리더보드는 합치면 안 됩니다 — "
-    "이유는 `leaderboard/external/README.md`를 보세요.")
+    "이 페이지의 어떤 숫자도 우리가 측정한 것이 아닙니다. 직접 돌린 결과는 "
+    "**첫 페이지**에 있고, 두 리더보드는 합치면 안 됩니다 — 이유는 "
+    "`leaderboard/external/README.md` 를 보세요.")
 
 # --- cross-source view, explicitly labelled as not a ranking ---------------
 with st.expander("전체 출처 한눈에 보기 (순위 아님)", expanded=False):

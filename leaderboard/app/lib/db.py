@@ -136,10 +136,12 @@ def provenance(run_id: str) -> dict:
     return row
 
 
-def sidebar_footer() -> None:
+def sidebar_footer(container=None) -> None:
+    """게시 시각과 부트스트랩 설정. 발표 중에는 읽을 것이 아니므로 기본으로는
+    사이드바 맨 아래에, 페이지가 컨테이너를 넘겨주면 그 안에 접어 둔다."""
     info = publish_info()
-    st.sidebar.divider()
-    st.sidebar.caption(
+    container = container or st.sidebar
+    container.caption(
         f"published {info.get('published_at', '?')}  \n"
         f"schema v{info.get('schema_version', '?')} · "
         f"bootstrap R={info.get('bootstrap_R', '?')} seed={info.get('bootstrap_seed', '?')}")

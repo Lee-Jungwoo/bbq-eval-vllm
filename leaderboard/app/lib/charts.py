@@ -22,8 +22,8 @@ def bias_dotplot(frame: pd.DataFrame) -> go.Figure:
     category_order = ordered["model_short"].tolist()[::-1]
 
     fig = go.Figure()
-    for eligible, colour, label in ((1, t.BIASED, "ranked"),
-                                    (0, t.UNKNOWN, "below the accuracy gate")):
+    for eligible, colour, label in ((1, t.BIASED, "순위에 든 모델"),
+                                    (0, t.UNKNOWN, "정답률이 낮아 제외")):
         sub = ordered[ordered["eligible"] == eligible]
         if sub.empty:
             continue
@@ -44,17 +44,17 @@ def bias_dotplot(frame: pd.DataFrame) -> go.Figure:
                                  sub["abstention_tier"]], axis=-1),
             hovertemplate=(
                 "<b>%{y}</b><br>"
-                "B = %{x:.4f}  [%{customdata[0]:.4f}, %{customdata[1]:.4f}]<br>"
-                "s_DIS = %{customdata[2]:+.4f} · s_AMB = %{customdata[3]:+.4f}<br>"
-                "s_AMB unscaled = %{customdata[4]:+.4f}<br>"
-                "abstained on %{customdata[5]:.1%} of ambiguous items "
-                "(n_elig = %{customdata[6]:,.0f})<br>"
-                "abstention flag: %{customdata[7]}<extra></extra>"),
+                "편향 점수 %{x:.4f}  [%{customdata[0]:.4f}, %{customdata[1]:.4f}]<br>"
+                "정보 있을 때 %{customdata[2]:+.4f} · "
+                "정보 없을 때 %{customdata[3]:+.4f}<br>"
+                "굳이 답할 때 %{customdata[4]:+.4f}<br>"
+                "“모르겠다” %{customdata[5]:.1%} "
+                "(실제로 답한 문항 %{customdata[6]:,.0f}개)<extra></extra>"),
         ))
     fig.add_vline(x=0, line=dict(color=t.AXIS, width=1, dash="dash"))
     return t.apply(fig, height=80 + 34 * len(ordered),
-                   title="모델별 Bias (95% cluster-bootstrap CI)",
-                   xaxis_title="<- 편향이 작음                        편향이 큼 ->",
+                   title="모델별 편향 점수 (막대 = 95% 신뢰구간)",
+                   xaxis_title="← 편향이 작음                        편향이 큼 →",
                    yaxis_title=None,
                    yaxis=dict(showgrid=False, categoryorder="array",
                               categoryarray=category_order))
@@ -225,25 +225,35 @@ def s_answered_by_category(frame: pd.DataFrame, min_n: int) -> go.Figure:
 def scaling_curve(frame: pd.DataFrame, columns: tuple[str, ...],
                   labels: tuple[str, ...], colours: tuple[str, ...],
                   title: str, yaxis_title: str, *,
-                  hline: float | None = None, hline_label: str = "") -> go.Figure:
-    """Metric vs parameter count on a log x-axis, one line per series."""
+                  hline: float | None = None, hline_label: str = "",
+                  hollow: "pd.Series | None" = None) -> go.Figure:
+    """Metric vs parameter count on a log x-axis, one line per series.
+
+    `hollow` marks the runs whose numbers must not be read — the ones below the
+    accuracy gate. They stay on the line (the ladder is the point) but are drawn
+    as empty circles, so the eye does not anchor the trend on a model that
+    cannot answer the questions at all.
+    """
+    empty = (np.zeros(len(frame), dtype=bool) if hollow is None
+             else hollow.to_numpy(dtype=bool))
     fig = go.Figure()
     for column, label, colour in zip(columns, labels, colours):
         fig.add_trace(go.Scatter(
             x=frame["params_b"], y=frame[column], mode="lines+markers", name=label,
             line=dict(color=colour, width=2),
-            marker=dict(size=9, color=colour,
-                        line=dict(width=2, color=t.SURFACE)),
+            marker=dict(size=9,
+                        color=np.where(empty, t.SURFACE, colour),
+                        line=dict(width=2, color=colour)),
             text=frame["model_short"],
             hovertemplate=(f"<b>%{{text}}</b><br>{label}: %{{y:.4f}}"
-                           "<br>%{x:g}B params<extra></extra>"),
+                           "<br>%{x:g}B<extra></extra>"),
         ))
     if hline is not None:
         fig.add_hline(y=hline, line=dict(color=t.AXIS, width=1, dash="dash"),
                       annotation_text=hline_label, annotation_position="right",
                       annotation_font=dict(color=t.MUTED, size=11))
     return t.apply(fig, height=380, title=title,
-                   xaxis_title="parameters (B, log scale)",
+                   xaxis_title="모델 크기 (파라미터 수, 로그 눈금)",
                    yaxis_title=yaxis_title,
                    xaxis=dict(type="log", tickmode="array",
                               tickvals=frame["params_b"].tolist(),
@@ -254,9 +264,9 @@ def scaling_response_composition(frame: pd.DataFrame, condition: str) -> go.Figu
     """Response mix by parameter count for one BBQ context condition."""
     counts = {
         "ambiguous": ("n_ambig", "n_unknown_ambig", "n_elig_ambig",
-                      "n_biased_ambig", "ambiguous"),
+                      "n_biased_ambig", "정보가 없는 문항"),
         "disambiguated": ("n_disambig", "n_unknown_disambig", "n_elig_disambig",
-                            "n_biased_disambig", "disambiguated"),
+                            "n_biased_disambig", "정보가 있는 문항"),
     }
     try:
         total_col, unknown_col, eligible_col, biased_col, label = counts[condition]
@@ -265,9 +275,9 @@ def scaling_response_composition(frame: pd.DataFrame, condition: str) -> go.Figu
 
     total = frame[total_col].to_numpy()
     response_counts = (
-        (unknown_col, "unknown", t.UNKNOWN),
-        (None, "anti-biased", t.COUNTER),
-        (biased_col, "biased", t.BIASED),
+        (unknown_col, "“모르겠다”", t.UNKNOWN),
+        (None, "반대 방향", t.COUNTER),
+        (biased_col, "고정관념 방향", t.BIASED),
     )
     parameter_labels = [f"{value:g}B" for value in frame["params_b"]]
     fig = go.Figure()
@@ -279,13 +289,13 @@ def scaling_response_composition(frame: pd.DataFrame, condition: str) -> go.Figu
             x=parameter_labels, y=share, name=series_label,
             marker=dict(color=colour, line=dict(color=t.SURFACE, width=1)),
             customdata=values,
-            hovertemplate=(f"<b>{series_label}</b><br>{series_label}: %{{y:.1%}} "
-                           "(%{customdata:,} items)<br>%{x} parameters<extra></extra>"),
+            hovertemplate=(f"<b>{series_label}</b>: %{{y:.1%}} "
+                           "(%{customdata:,}개)<br>%{x}<extra></extra>"),
         ))
     return t.apply(fig, height=380,
-                   title=f"{label.capitalize()} responses by parameter scale",
+                   title=f"크기별 응답 구성 — {label}",
                    barmode="stack", bargap=0.22,
-                   xaxis_title="parameters (B)", yaxis_title="share of items",
+                   xaxis_title="모델 크기", yaxis_title="문항 중 비율",
                    xaxis=dict(type="category", categoryorder="array",
                               categoryarray=parameter_labels),
                    yaxis=dict(range=[0, 1], tickformat=".0%"))
@@ -295,8 +305,8 @@ def scaling_ambiguous_non_unknown(frame: pd.DataFrame) -> go.Figure:
     """Biased and anti-biased mix among ambiguous non-unknown responses."""
     total = frame["n_elig_ambig"].to_numpy()
     response_counts = (
-        (frame["n_elig_ambig"] - frame["n_biased_ambig"], "anti-biased", t.COUNTER),
-        (frame["n_biased_ambig"], "biased", t.BIASED),
+        (frame["n_elig_ambig"] - frame["n_biased_ambig"], "반대 방향", t.COUNTER),
+        (frame["n_biased_ambig"], "고정관념 방향", t.BIASED),
     )
     parameter_labels = [f"{value:g}B" for value in frame["params_b"]]
     fig = go.Figure()
@@ -306,13 +316,13 @@ def scaling_ambiguous_non_unknown(frame: pd.DataFrame) -> go.Figure:
             x=parameter_labels, y=share, name=label,
             marker=dict(color=colour, line=dict(color=t.SURFACE, width=1)),
             customdata=counts,
-            hovertemplate=(f"<b>{label}</b><br>{label}: %{{y:.1%}} "
-                           "(%{customdata:,} items)<br>%{x} parameters<extra></extra>"),
+            hovertemplate=(f"<b>{label}</b>: %{{y:.1%}} "
+                           "(%{customdata:,}개)<br>%{x}<extra></extra>"),
         ))
     return t.apply(fig, height=280,
-                   title="Biased vs anti-biased ambiguous responses",
+                   title="“모르겠다”를 고르지 않은 답만 — 어느 쪽으로 갔나",
                    barmode="stack", bargap=0.22,
-                   xaxis_title="parameters (B)", yaxis_title="share of non-unknown responses",
+                   xaxis_title="모델 크기", yaxis_title="답한 문항 중 비율",
                    xaxis=dict(type="category", categoryorder="array",
                               categoryarray=parameter_labels),
                    yaxis=dict(range=[0, 1], tickformat=".0%"))
