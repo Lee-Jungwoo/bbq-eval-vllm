@@ -231,6 +231,7 @@ python scripts/export_summary.py
 ```
 
 - 프롬프트 템플릿과 평가 설정이 같으면 run_id가 같게 나온다. `configs/serving/*.yaml`과 `configs/eval/*.json`으로 계산한 run_id 48개가 `results/` 아래 기록된 run과 모두 일치한다.
+- gpt-oss-20b의 chat template은 실행 날짜(`Current date: ...`)를 system 메시지에 넣는다. 그래서 이 모델은 다시 돌리면 프롬프트가 그 한 줄만큼 달라진다(기록된 run은 2026-08-19). 다른 모델의 첫 문항 프롬프트는 기록과 바이트 단위로 같게 나오는 것을 Qwen3-0.6B로 확인했다.
 - 모델 revision은 commit sha로 고정되어 있다(`configs/serving/*.yaml`, `results/runs*/*/meta.json`).
 - 원시 출력(`requests`, `instances`, `responses`, `records.jsonl`, run당 최대 약 60MB)과 `bbq.sqlite`는 커밋하지 않는다. 그래서 `publish.py --verify`와 run 재집계는 원시 출력을 가진 머신에서만 된다. 강제 선택 조건의 원시 출력은 이 레포를 만든 로컬 머신에도 없다.
 - Mistral 계열은 `mistral_common` 설치 여부에 따라 토크나이저가 달라진다. `prepare`는 `serve_logprobs.py`와 같은 환경에서 돌려야 한다([`docs/pipeline.md`](docs/pipeline.md#vision-capable-models)).

@@ -87,6 +87,7 @@ system 프롬프트는 따로 넣지 않으며, 모델 템플릿이 기본으로
   채널 헤더가 되고 A/B/C가 상위 logprob 밖으로 밀려났다. 그래서 모델 이름 접두사로
   `<|channel|>final<|message|>`를 프롬프트 끝에 붙인다(`pipeline.py`의
   `ASSISTANT_PREFILL`, 커밋 4fd7376).
+- gpt-oss 템플릿은 실행 날짜(`Current date: ...`)를 system 메시지에 넣으므로, 같은 설정으로 다시 돌려도 프롬프트가 그 한 줄만큼 달라진다.
 - 라벨 토큰: `tokenizer_checker.py`가 `"A"`와 `" A"` 중 단일 토큰으로 인코딩되는 쪽을
   고른다. 24개 모델 모두 공백 없는 `"A"` 쪽이 선택되었다(`meta.json`의
   `label_token_variant`).
