@@ -1,47 +1,56 @@
 # vLLM serving config for Qwen/Qwen2.5-14B-Instruct
-# Read by scripts/serve.py, which turns it into src/bbq_eval/serve_logprobs.py flags.
-# Values are the code defaults that drove the runs, or, where provenance has a
-# session_recommendation, the command recommended then. provenance says which
-# values a run log actually confirms.
+# Read by scripts/serve.py, which turns one condition block into
+# src/bbq_eval/serve_logprobs.py flags. Every engine value below is what the run
+# actually used, read from the vLLM engine log ("non-default args") on the lab
+# server, unless provenance.source says otherwise.
 
 model: "Qwen/Qwen2.5-14B-Instruct"
-revision: "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8"   # pinned sha, from results/runs/*/meta.json
-params_b: 14   # parsed from the model name (bbq_metrics.family_and_size)
+revision: "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8"   # pinned sha, from results/runs*/*/meta.json
+params_b: 14   # parsed from the model name
+gpu: "NVIDIA GeForce RTX 3090 24GB"   # lab server: 2 of them (nvidia-smi, driver 555.42.06)
 
-engine:                         # keyword arguments of vllm.LLM(...)
-  dtype: bfloat16
-  max_model_len: 1024           # prompt length of this run: not recorded in meta.json
-  gpu_memory_utilization: 0.90
-  tensor_parallel_size: 2
-  max_num_seqs: 64                # session recommendation, see provenance
-  limit_images: null            # null: flag not passed (text-only model)
-  quantization: null            # serve_logprobs.py has no quantization flag; never passed
+original:
+  run_id: Qwen2.5-14B-Instruct_bfloat16_49eb7f5a
+  engine:                       # keyword arguments of vllm.LLM(...)
+    dtype: bfloat16
+    max_model_len: 1024         # longest prompt: not recorded in meta.json
+    gpu_memory_utilization: 0.90
+    tensor_parallel_size: 2
+    max_num_seqs: 64
+    limit_images: null          # null: not passed
+  runner:                       # serve_logprobs.py's own flags
+    batch_size: 512
+    top_logprobs: 50
+    max_tokens: 1
+  hardware:
+    cuda_visible_devices: "0,1"   # CUDA_DEVICE_ORDER=PCI_BUS_ID
+  provenance:
+    source: server_log            # engine args read from the vLLM log of the run
+    vllm_version: "0.10.2"
+    engine_quantization: null           # quantization=None in the engine log
+    log: "pipeline/logs/ladder_20260728_111232/Qwen2.5-14B-Instruct.2_serve.log"   # path on the lab server, relative to the repo checkout there
+    note: >-
+      Earlier attempts failed: TP 1 with gpu_memory_utilization 0.95 (ladder_20260728_105529,
+      weights do not fit one GPU) and TP 2 without max_num_seqs (ladder_20260728_110046, OOM
+      in the sampler warmup with 256 dummy requests).
 
-runner:                         # serve_logprobs.py's own flags
-  batch_size: 512               # prompts handed to llm.generate() per call
-  top_logprobs: 50              # SamplingParams(logprobs=50), LLM(max_logprobs=50)
-  max_tokens: 1                 # first-token logprobs only (temperature=1.0, top_p=1.0)
-
-hardware:
-  cuda_visible_devices: "0,1"     # GPU=0,1 for run_ladder.sh (CUDA_DEVICE_ORDER=PCI_BUS_ID)
-  gpu: "NVIDIA GeForce RTX 3090 24GB"   # lab server has 2; reported by the user (2026-11-15) and in session 54c52366
-
-provenance:
-  original_run: Qwen2.5-14B-Instruct_bfloat16_49eb7f5a
-  forced_choice_run: Qwen2.5-14B-Instruct_bfloat16_ab_3d008a86
-  vllm_version: null              # not recorded
-  log: null
-  confirmed_by_log: []
-    # No run log. tensor_parallel_size, max_num_seqs, max_model_len and
-    # cuda_visible_devices follow the command Claude recommended in a local
-    # Claude Code session; the user states the runs followed those
-    # recommendations. Applies to the original-condition run; the
-    # forced-choice run (2026-08-18/19) has no record. Other values are defaults.
-  session_recommendation:
-    session: 54c52366 (Claude Code, 2026-07-27/28)
-    when: "2026-07-28 02:09 (the user reported the run finished at 02:39)"
-    command: "GPU=0,1 MAX_NUM_SEQS=64 ./run_ladder.sh Qwen/Qwen2.5-14B-Instruct"
-  notes: |
-    TP (GPU=0,1) and MAX_NUM_SEQS were added to run_ladder.sh while this model
-    was running out of memory (commits 74b79f3, 64ddd15): first the weights did not
-    fit one GPU, then the sampler warmup with 256 dummy requests ran out of memory.
+forced_choice:
+  run_id: Qwen2.5-14B-Instruct_bfloat16_ab_3d008a86
+  engine:                       # keyword arguments of vllm.LLM(...)
+    dtype: bfloat16
+    max_model_len: 1024         # longest prompt: 233 tokens
+    gpu_memory_utilization: 0.90
+    tensor_parallel_size: 2
+    max_num_seqs: 64
+    limit_images: 0          # limit_mm_per_prompt={"image": 0}
+  runner:                       # serve_logprobs.py's own flags
+    batch_size: 512
+    top_logprobs: 50
+    max_tokens: 1
+  hardware:
+    cuda_visible_devices: "0,1"   # CUDA_DEVICE_ORDER=PCI_BUS_ID
+  provenance:
+    source: server_log            # engine args read from the vLLM log of the run
+    vllm_version: "0.26.0"
+    engine_quantization: null           # quantization=None in the engine log
+    log: "bbq_pipeline/logs/ladder_binary_20260819_124535/Qwen2.5-14B-Instruct.2_serve.log"   # path on the lab server, relative to the repo checkout there

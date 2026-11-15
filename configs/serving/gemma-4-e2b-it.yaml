@@ -1,39 +1,52 @@
 # vLLM serving config for google/gemma-4-E2B-it
-# Read by scripts/serve.py, which turns it into src/bbq_eval/serve_logprobs.py flags.
-# Values are the code defaults that drove the runs, or, where provenance has a
-# session_recommendation, the command recommended then. provenance says which
-# values a run log actually confirms.
+# Read by scripts/serve.py, which turns one condition block into
+# src/bbq_eval/serve_logprobs.py flags. Every engine value below is what the run
+# actually used, read from the vLLM engine log ("non-default args") on the lab
+# server, unless provenance.source says otherwise.
 
 model: "google/gemma-4-E2B-it"
-revision: "3e22461f65e89153144f8adb70e3b8c2cc9845a7"   # pinned sha, from results/runs/*/meta.json
-params_b: 2   # parsed from the model name (bbq_metrics.family_and_size)
+revision: "3e22461f65e89153144f8adb70e3b8c2cc9845a7"   # pinned sha, from results/runs*/*/meta.json
+params_b: 2   # parsed from the model name (effective size)
+gpu: "NVIDIA GeForce RTX 3090 24GB"   # lab server: 2 of them (nvidia-smi, driver 555.42.06)
 
-engine:                         # keyword arguments of vllm.LLM(...)
-  dtype: bfloat16
-  max_model_len: 1024           # longest original-condition prompt: 233 tokens
-  gpu_memory_utilization: 0.90
-  tensor_parallel_size: 1
-  max_num_seqs: null              # null: not passed (vLLM default; 256 in the 2026-07-28 OOM message)
-  limit_images: null            # null: flag not passed (text-only model)
-  quantization: null            # serve_logprobs.py has no quantization flag; never passed
+original:
+  run_id: gemma-4-E2B-it_bfloat16_415e6650
+  engine:                       # keyword arguments of vllm.LLM(...)
+    dtype: bfloat16
+    max_model_len: 1024         # longest prompt: 233 tokens
+    gpu_memory_utilization: 0.90
+    tensor_parallel_size: 2
+    max_num_seqs: 64
+    limit_images: 0          # limit_mm_per_prompt={"image": 0}
+  runner:                       # serve_logprobs.py's own flags
+    batch_size: 512
+    top_logprobs: 50
+    max_tokens: 1
+  hardware:
+    cuda_visible_devices: "0,1"   # CUDA_DEVICE_ORDER=PCI_BUS_ID
+  provenance:
+    source: server_log            # engine args read from the vLLM log of the run
+    vllm_version: "0.26.0"
+    engine_quantization: null           # quantization=None in the engine log
+    log: "pipeline/logs/ladder_20260805_160146/gemma-4-E2B-it.2_serve.log"   # path on the lab server, relative to the repo checkout there
 
-runner:                         # serve_logprobs.py's own flags
-  batch_size: 512               # prompts handed to llm.generate() per call
-  top_logprobs: 50              # SamplingParams(logprobs=50), LLM(max_logprobs=50)
-  max_tokens: 1                 # first-token logprobs only (temperature=1.0, top_p=1.0)
-
-hardware:
-  cuda_visible_devices: "1"       # GPU=1 for run_ladder.sh (CUDA_DEVICE_ORDER=PCI_BUS_ID)
-  gpu: "NVIDIA GeForce RTX 3090 24GB"   # lab server has 2; reported by the user (2026-11-15) and in session 54c52366
-
-provenance:
-  original_run: gemma-4-E2B-it_bfloat16_415e6650
-  forced_choice_run: gemma-4-E2B-it_bfloat16_ab_0cefc4cc
-  vllm_version: null              # not recorded
-  log: null
-  confirmed_by_log: []
-    # No run log for this model. Every engine/runner value above is the
-    # scripts/run_ladder.sh (or serve_logprobs.py) default; whether it was
-    # overridden through env vars at run time is not recorded.
-  notes: |
-    params_b is the effective size in the model name (E2B/E4B), not the raw count.
+forced_choice:
+  run_id: gemma-4-E2B-it_bfloat16_ab_0cefc4cc
+  engine:                       # keyword arguments of vllm.LLM(...)
+    dtype: bfloat16
+    max_model_len: 1024         # longest prompt: 225 tokens
+    gpu_memory_utilization: 0.90
+    tensor_parallel_size: 1
+    max_num_seqs: 64
+    limit_images: 0          # limit_mm_per_prompt={"image": 0}
+  runner:                       # serve_logprobs.py's own flags
+    batch_size: 512
+    top_logprobs: 50
+    max_tokens: 1
+  hardware:
+    cuda_visible_devices: "0"   # CUDA_DEVICE_ORDER=PCI_BUS_ID
+  provenance:
+    source: server_log            # engine args read from the vLLM log of the run
+    vllm_version: "0.26.0"
+    engine_quantization: null           # quantization=None in the engine log
+    log: "bbq_pipeline/logs/ladder_binary_20260819_154658/gemma-4-E2B-it.2_serve.log"   # path on the lab server, relative to the repo checkout there

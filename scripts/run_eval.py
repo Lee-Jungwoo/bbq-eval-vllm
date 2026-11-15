@@ -172,7 +172,7 @@ def main() -> None:
     from serve import load_serving_config
 
     cond = CONDITIONS[args.condition]
-    serving = load_serving_config(args.serving)
+    serving = load_serving_config(args.serving, args.condition)
     eval_config_path = Path(args.eval_config) if args.eval_config else cond["eval_config"]
     config = per_model_config(eval_config_path, serving["model"])
 
@@ -207,7 +207,8 @@ def main() -> None:
             raise SystemExit(f"prepare reported run id {printed}, expected {run_id}")
     if "serve" in steps:
         cmd = [sys.executable, str(REPO_ROOT / "scripts" / "serve.py"),
-               "--config", args.serving, "--run-dir", str(run_dir)]
+               "--config", args.serving, "--condition", args.condition,
+               "--run-dir", str(run_dir)]
         if args.gpu:
             cmd += ["--gpu", args.gpu]
         run(cmd)

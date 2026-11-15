@@ -78,7 +78,7 @@ streamlit run app/Home.py
 Text-only prompts run fine on multimodal checkpoints (Ministral-3, Mistral-Small-3.x),
 but vLLM profiles the vision tower at startup with a dummy image worth a few thousand
 tokens, which blows past a small `--max-model-len`. Pass `--limit-images 0`
-(`LIMIT_IMAGES=0` for `run_ladder.sh`, `engine.limit_images: 0` in a serving yaml)
+(`LIMIT_IMAGES=0` for `run_ladder.sh`, `<condition>.engine.limit_images: 0` in a serving yaml)
 to switch the image path off; nothing in BBQ uses it.
 
 Mistral checkpoints additionally ship two tokenizers, and which one `AutoTokenizer`

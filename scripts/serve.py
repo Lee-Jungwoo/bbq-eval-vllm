@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 """Run vLLM inference for one model from its serving config.
 
-Reads configs/serving/<model>.yaml and launches src/bbq_eval/serve_logprobs.py with
-the same flags scripts/run_ladder.sh passes. This is offline batch inference with
+Reads one condition block (original or forced_choice) of configs/serving/<model>.yaml
+and launches src/bbq_eval/serve_logprobs.py with the same flags scripts/run_ladder.sh
+passes. The blocks hold the engine arguments each recorded run actually used. This is offline batch inference with
 the vllm.LLM class (no HTTP server): serve_logprobs.py reads a pre-tokenized
 requests.jsonl, calls llm.generate() batch by batch, and appends first-token
 logprobs to responses.jsonl. It resumes from whatever responses.jsonl already
 holds.
 
 Examples:
-    # inputs from a prepared run directory (revision is taken from its meta.json)
+    # inputs from a prepared run directory (condition and revision come from its meta.json)
     python scripts/serve.py --config configs/serving/qwen2.5-3b-instruct.yaml \
         --run-dir results/runs/Qwen2.5-3B-Instruct_bfloat16_6db43b09
 
     # on the GPU server, with requests.jsonl copied next to this script
-    python scripts/serve.py --config qwen2.5-3b-instruct.yaml \
+    python scripts/serve.py --config qwen2.5-3b-instruct.yaml --condition forced_choice \
         --input requests.jsonl --output responses.jsonl --gpu 0
 
     # print the command and environment without running anything
@@ -34,18 +35,31 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SERVE_SCRIPT = REPO_ROOT / "src" / "bbq_eval" / "serve_logprobs.py"
 
 
-def load_serving_config(path: str | Path) -> dict:
+CONDITIONS = ("original", "forced_choice")
+
+
+def condition_of_meta(meta: dict) -> str:
+    """meta.json of a forced-choice run carries "arm": "binary"; original runs carry none."""
+    return "forced_choice" if meta.get("arm") == "binary" else "original"
+
+
+def load_serving_config(path: str | Path, condition: str) -> dict:
+    """The model-level keys merged with one condition block."""
     import yaml  # local import: --help works without PyYAML
 
     with open(path, encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-    for key in ("model", "revision", "engine", "runner"):
-        if key not in config:
+        raw = yaml.safe_load(f)
+    if condition not in CONDITIONS:
+        raise SystemExit(f"unknown condition {condition!r}; choose from {CONDITIONS}")
+    for key in ("model", "revision", condition):
+        if key not in raw:
             raise SystemExit(f"{path}: missing '{key}'")
-    if config["engine"].get("quantization") is not None:
-        raise SystemExit(f"{path}: engine.quantization is set, but serve_logprobs.py has "
-                         "no quantization flag (no run used one)")
-    return config
+    block = raw[condition]
+    for key in ("engine", "runner"):
+        if key not in block:
+            raise SystemExit(f"{path}: missing '{condition}.{key}'")
+    return {"model": raw["model"], "revision": raw["revision"], "gpu": raw.get("gpu"),
+            "condition": condition, **block}
 
 
 def build_command(config: dict, input_path: str | Path, output_path: str | Path,
@@ -84,13 +98,17 @@ def build_env(config: dict, gpu: str | None) -> dict[str, str]:
     return {"CUDA_DEVICE_ORDER": "PCI_BUS_ID", "CUDA_VISIBLE_DEVICES": devices}
 
 
+def read_run_meta(run_dir: str | Path) -> dict:
+    meta_path = Path(run_dir) / "meta.json"
+    if not meta_path.exists():
+        raise SystemExit(f"{meta_path} not found; run the prepare step first")
+    return json.loads(meta_path.read_text(encoding="utf-8"))
+
+
 def resolve_io(config: dict, args: argparse.Namespace) -> tuple[Path, Path, str]:
     if args.run_dir:
         run_dir = Path(args.run_dir)
-        meta_path = run_dir / "meta.json"
-        if not meta_path.exists():
-            raise SystemExit(f"{meta_path} not found; run the prepare step first")
-        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        meta = read_run_meta(run_dir)
         if meta["model"] != config["model"]:
             raise SystemExit(f"run dir is for {meta['model']}, config is for {config['model']}")
         # Same as run_ladder.sh: the revision prepare resolved and recorded wins.
@@ -108,6 +126,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", required=True, help="configs/serving/<model>.yaml")
+    parser.add_argument("--condition", choices=CONDITIONS,
+                        help="which block of the config to use (default with --run-dir: "
+                             "read from its meta.json; required with --input/--output)")
     parser.add_argument("--run-dir", help="results/runs[_binary]/<run_id> made by prepare")
     parser.add_argument("--input", help="requests.jsonl (instead of --run-dir)")
     parser.add_argument("--output", help="responses.jsonl (instead of --run-dir)")
@@ -121,7 +142,15 @@ def main() -> None:
                         help="print the command and environment, run nothing")
     args = parser.parse_args()
 
-    config = load_serving_config(args.config)
+    condition = args.condition
+    if args.run_dir:
+        from_meta = condition_of_meta(read_run_meta(args.run_dir))
+        if condition and condition != from_meta:
+            raise SystemExit(f"--condition {condition} but the run dir is a {from_meta} run")
+        condition = from_meta
+    elif condition is None:
+        raise SystemExit("--condition is required with --input/--output")
+    config = load_serving_config(args.config, condition)
     input_path, output_path, revision = resolve_io(config, args)
     cmd = build_command(config, input_path, output_path, revision,
                         serve_script=args.serve_script)
@@ -132,6 +161,8 @@ def main() -> None:
         print(f"[serve] warning: {n_devices} visible device(s) but tensor_parallel_size="
               f"{config['engine']['tensor_parallel_size']}", file=sys.stderr)
 
+    print(f"[serve] condition={condition} vllm (recorded run)="
+          f"{config.get('provenance', {}).get('vllm_version')}", flush=True)
     print("[serve] " + " ".join(f"{k}={v}" for k, v in env.items()) + " "
           + " ".join(shlex.quote(c) for c in cmd), flush=True)
     if args.dry_run:
