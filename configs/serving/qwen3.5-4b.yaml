@@ -1,0 +1,36 @@
+# vLLM serving config for Qwen/Qwen3.5-4B
+# Read by scripts/serve.py, which turns it into src/bbq_eval/serve_logprobs.py flags.
+# Values are copied from the code defaults that drove the runs; see `provenance`
+# for which of them a run log actually confirms.
+
+model: "Qwen/Qwen3.5-4B"
+revision: "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a"   # pinned sha, from results/runs/*/meta.json
+params_b: 4   # parsed from the model name (bbq_metrics.family_and_size)
+
+engine:                         # keyword arguments of vllm.LLM(...)
+  dtype: bfloat16
+  max_model_len: 1024           # longest original-condition prompt: 233 tokens
+  gpu_memory_utilization: 0.90
+  tensor_parallel_size: 1
+  max_num_seqs: null            # null: flag not passed, vLLM's own default
+  limit_images: null            # null: flag not passed (text-only model)
+  quantization: null            # serve_logprobs.py has no quantization flag; never passed
+
+runner:                         # serve_logprobs.py's own flags
+  batch_size: 512               # prompts handed to llm.generate() per call
+  top_logprobs: 50              # SamplingParams(logprobs=50), LLM(max_logprobs=50)
+  max_tokens: 1                 # first-token logprobs only (temperature=1.0, top_p=1.0)
+
+hardware:
+  cuda_visible_devices: "1"     # run_ladder.sh default GPU=1 (CUDA_DEVICE_ORDER=PCI_BUS_ID)
+  gpu: null                     # GPU model: not recorded
+
+provenance:
+  original_run: Qwen3.5-4B_bfloat16_3a099c32
+  forced_choice_run: Qwen3.5-4B_bfloat16_ab_2f4bd132
+  vllm_version: null              # not recorded
+  log: null
+  confirmed_by_log: []
+    # No run log for this model. Every engine/runner value above is the
+    # scripts/run_ladder.sh (or serve_logprobs.py) default; whether it was
+    # overridden through env vars at run time is not recorded.

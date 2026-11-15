@@ -1,0 +1,40 @@
+# vLLM serving config for Qwen/Qwen2.5-14B-Instruct
+# Read by scripts/serve.py, which turns it into src/bbq_eval/serve_logprobs.py flags.
+# Values are copied from the code defaults that drove the runs; see `provenance`
+# for which of them a run log actually confirms.
+
+model: "Qwen/Qwen2.5-14B-Instruct"
+revision: "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8"   # pinned sha, from results/runs/*/meta.json
+params_b: 14   # parsed from the model name (bbq_metrics.family_and_size)
+
+engine:                         # keyword arguments of vllm.LLM(...)
+  dtype: bfloat16
+  max_model_len: 1024           # prompt length of this run: not recorded in meta.json
+  gpu_memory_utilization: 0.90
+  tensor_parallel_size: 1
+  max_num_seqs: null            # null: flag not passed, vLLM's own default
+  limit_images: null            # null: flag not passed (text-only model)
+  quantization: null            # serve_logprobs.py has no quantization flag; never passed
+
+runner:                         # serve_logprobs.py's own flags
+  batch_size: 512               # prompts handed to llm.generate() per call
+  top_logprobs: 50              # SamplingParams(logprobs=50), LLM(max_logprobs=50)
+  max_tokens: 1                 # first-token logprobs only (temperature=1.0, top_p=1.0)
+
+hardware:
+  cuda_visible_devices: "1"     # run_ladder.sh default GPU=1 (CUDA_DEVICE_ORDER=PCI_BUS_ID)
+  gpu: null                     # GPU model: not recorded
+
+provenance:
+  original_run: Qwen2.5-14B-Instruct_bfloat16_49eb7f5a
+  forced_choice_run: Qwen2.5-14B-Instruct_bfloat16_ab_3d008a86
+  vllm_version: null              # not recorded
+  log: null
+  confirmed_by_log: []
+    # No run log for this model. Every engine/runner value above is the
+    # scripts/run_ladder.sh (or serve_logprobs.py) default; whether it was
+    # overridden through env vars at run time is not recorded.
+  notes: |
+    TP (GPU=0,1) and MAX_NUM_SEQS were added to run_ladder.sh while this model
+    was running out of memory (commits 74b79f3, 64ddd15). Which values it ran
+    with: not recorded.

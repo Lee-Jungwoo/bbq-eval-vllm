@@ -1,0 +1,40 @@
+# vLLM serving config for mistralai/Ministral-3-3B-Instruct-2512-BF16
+# Read by scripts/serve.py, which turns it into src/bbq_eval/serve_logprobs.py flags.
+# Values are copied from the code defaults that drove the runs; see `provenance`
+# for which of them a run log actually confirms.
+
+model: "mistralai/Ministral-3-3B-Instruct-2512-BF16"
+revision: "b6d637bef2393152b3da2b2fde72eecdee30557e"   # pinned sha, from results/runs/*/meta.json
+params_b: 3   # parsed from the model name (bbq_metrics.family_and_size)
+
+engine:                         # keyword arguments of vllm.LLM(...)
+  dtype: bfloat16
+  max_model_len: 1024           # longest original-condition prompt: 216 tokens
+  gpu_memory_utilization: 0.90
+  tensor_parallel_size: 1
+  max_num_seqs: null            # null: flag not passed, vLLM's own default
+  limit_images: 0               # limit_mm_per_prompt={"image": 0}: vision path off
+  quantization: null            # serve_logprobs.py has no quantization flag; never passed
+
+runner:                         # serve_logprobs.py's own flags
+  batch_size: 512               # prompts handed to llm.generate() per call
+  top_logprobs: 50              # SamplingParams(logprobs=50), LLM(max_logprobs=50)
+  max_tokens: 1                 # first-token logprobs only (temperature=1.0, top_p=1.0)
+
+hardware:
+  cuda_visible_devices: "1"     # run_ladder.sh default GPU=1 (CUDA_DEVICE_ORDER=PCI_BUS_ID)
+  gpu: null                     # GPU model: not recorded
+
+provenance:
+  original_run: Ministral-3-3B-Instruct-2512-BF16_bfloat16_e520013e
+  forced_choice_run: Ministral-3-3B-Instruct-2512-BF16_bfloat16_ab_62e4bed4
+  vllm_version: null              # not recorded
+  log: null
+  confirmed_by_log: []
+    # No run log for this model. Every engine/runner value above is the
+    # scripts/run_ladder.sh (or serve_logprobs.py) default; whether it was
+    # overridden through env vars at run time is not recorded.
+  notes: |
+    Vision-capable checkpoint. limit_images: 0 follows the usage line in
+    scripts/run_ladder.sh and docs/pipeline.md ("Vision-capable models"); no run log
+    records the value actually passed.
