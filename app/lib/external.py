@@ -1,7 +1,7 @@
 """Read `leaderboard/external/` — BBQ results published by other people.
 
 Kept strictly apart from `db.py`: nothing here touches `bbq.sqlite`, and none of
-these numbers came out of `bbq_pipeline/`. Each source is its own board because
+these numbers came out of `src/bbq_eval/`. Each source is its own board because
 the setups are not comparable — different prompt formats, shot counts, sample
 sizes and, for HELM, a different definition of `s_AMB`. See
 `leaderboard/external/README.md`.

@@ -1,6 +1,6 @@
 """Binary (A/B) BBQ leaderboard — the arm without an "unknown" option.
 
-Reads `bbq_pipeline/runs_binary/` through `lib/binary.py`. Deliberately a second
+Reads `results/runs_binary/` through `lib/binary.py`. Deliberately a second
 board rather than a toggle on Home: dropping the unknown option changes what
 `s_AMB` means and deletes `accuracy_ambig` outright, so the two rankings must not
 be read as one.
@@ -181,7 +181,7 @@ with st.expander("속성별 점수", expanded=False):
             hide_index=True, width="stretch")
 
 st.caption(
-    "이 페이지의 숫자는 `bbq_pipeline/runs_binary/*/summary.json` 에서 그대로 "
+    "이 페이지의 숫자는 `results/runs_binary/*/summary.json` 에서 그대로 "
     "읽어옵니다 — 계산은 `aggregate_binary.py` 가 하고, `bbq.sqlite` 와 "
-    "`leaderboard/exports/` 는 3-옵션 arm 전용입니다. 자세한 내용은 "
-    "`bbq_pipeline/README.md` 의 “Binary arm” 절을 보세요.")
+    "`results/leaderboard/exports/` 는 3-옵션 arm 전용입니다. 자세한 내용은 "
+    "`docs/pipeline.md` 의 “Binary arm” 절을 보세요.")

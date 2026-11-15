@@ -1,7 +1,7 @@
 """External BBQ leaderboard — results published by vendors and by HELM.
 
 Separate from the Home board on purpose. Nothing here was measured by
-`bbq_pipeline/`, the sources do not share a setup, and only one of them
+`src/bbq_eval/`, the sources do not share a setup, and only one of them
 publishes a bias score under the same definition this repo uses.
 """
 from __future__ import annotations

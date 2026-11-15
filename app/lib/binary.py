@@ -1,6 +1,6 @@
-"""Read the binary arm's runs — `bbq_pipeline/runs_binary/*/{meta,summary}.json`.
+"""Read the binary arm's runs — `results/runs_binary/*/{meta,summary}.json`.
 
-The A/B arm (`bbq_pipeline/pipeline_binary.py`) asks every BBQ item as a forced
+The A/B arm (`src/bbq_eval/pipeline_binary.py`) asks every BBQ item as a forced
 choice between the two group answers, with the "unknown" option removed in both
 context conditions. Kept strictly apart from `db.py`:
 
@@ -143,17 +143,14 @@ def require_runs() -> None:
         return
     st.error("아직 binary arm 실행 결과가 없습니다.")
     st.markdown(
-        "이 페이지는 `bbq_pipeline/runs_binary/<run_id>/summary.json` 을 읽습니다. "
+        "이 페이지는 `results/runs_binary/<run_id>/summary.json` 을 읽습니다. "
         "3-옵션 리더보드(**Home**)와 달리 `bbq.sqlite` 를 쓰지 않습니다. "
         "한 모델을 돌리는 전체 절차:")
     st.code(
-        "cd bbq_pipeline\n"
-        "python pipeline_binary.py prepare --config config_binary.json\n"
-        "# runs_binary/<run_id>/requests.jsonl 을 서버로 보내 serve_logprobs.py 실행\n"
-        "python pipeline_binary.py collect\n"
-        "python aggregate_binary.py runs_binary/<run_id>/records.jsonl \\\n"
-        "    --out runs_binary/<run_id>/summary.json\n"
-        "# 여러 모델을 한 번에: ./run_ladder_binary.sh <model> ...",
+        "python scripts/run_eval.py --condition forced_choice \\\n"
+        "    --serving configs/serving/<model>.yaml\n"
+        "# 단계별로: --steps prepare / serve / collect / aggregate\n"
+        "# 여러 모델을 한 번에: scripts/run_ladder_binary.sh <model> ...",
         language="bash")
     st.stop()
 

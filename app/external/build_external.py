@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Build the unified external BBQ table from raw/ into bbq_external.csv.
 
-Externally-published BBQ numbers only — nothing here comes from bbq_pipeline/.
-Everything is normalised onto the scale used by bbq_pipeline/bbq_metrics.py:
+Externally-published BBQ numbers only — nothing here comes from src/bbq_eval/.
+Everything is normalised onto the scale used by src/bbq_eval/bbq_metrics.py:
 s_DIS / s_AMB / accuracy_* are fractions in [-1, 1] / [0, 1], never percent.
 
 Re-run after editing anything in raw/:
 
-    python leaderboard/external/build_external.py
+    python app/external/build_external.py
 """
 
 import csv

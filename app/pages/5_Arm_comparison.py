@@ -1,7 +1,7 @@
 """3-option vs binary (A/B) — does removing the unknown option reorder the field?
 
 Joins the published 3-option board (`bbq.sqlite`, via `lib/db.py`) to the binary
-arm's summaries (`bbq_pipeline/runs_binary/`, via `lib/binary.py`) and ranks both
+arm's summaries (`results/runs_binary/`, via `lib/binary.py`) and ranks both
 sides over the same set of models. `lib/compare.py` does the join, the ranking and
 the figures; this file is layout and prose.
 
@@ -169,6 +169,6 @@ with st.expander("전체 수치", expanded=False):
         })
 
 st.caption(
-    "3지선다 수치는 `leaderboard/bbq.sqlite`, 2지선다 수치는 "
-    "`bbq_pipeline/runs_binary/*/summary.json` 에서 그대로 읽어옵니다. 이 페이지는 "
+    "3지선다 수치는 `results/leaderboard/bbq.sqlite`, 2지선다 수치는 "
+    "`results/runs_binary/*/summary.json` 에서 그대로 읽어옵니다. 이 페이지는 "
     "두 결과를 붙이고 순위만 다시 매길 뿐, 어떤 지표도 새로 정의하지 않습니다.")
