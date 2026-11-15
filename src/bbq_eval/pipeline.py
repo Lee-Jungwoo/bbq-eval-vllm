@@ -32,12 +32,14 @@ import re
 import sys
 from pathlib import Path
 
-from tokenizer_checker import choose_label_tokens
+from .tokenizer_checker import choose_label_tokens
 
 PIPELINE_DIR = Path(__file__).resolve().parent
-REPO_ROOT = PIPELINE_DIR.parent
+REPO_ROOT = PIPELINE_DIR.parents[1]
 # Upstream NYU BBQ files (data/*.jsonl, analysis_scripts/additional_metadata.csv).
 BBQ_ROOT = REPO_ROOT / "third_party" / "bbq"
+RUNS_DIR = REPO_ROOT / "results" / "runs"
+EVAL_CONFIG_DIR = REPO_ROOT / "configs" / "eval"
 
 SINGLE_AXIS_CATEGORIES = [
     "Age",
@@ -608,13 +610,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("command", choices=["prepare", "collect"])
-    parser.add_argument("--config", default=str(PIPELINE_DIR / "config.json"))
+    parser.add_argument("--config", default=str(EVAL_CONFIG_DIR / "original.json"))
     args = parser.parse_args()
 
     config = load_config(args.config)
     categories = resolve_categories(config)
     run_id = config["run_id"] or derive_run_id(config, categories)
-    run_dir = PIPELINE_DIR / "runs" / run_id
+    run_dir = RUNS_DIR / run_id
     print(f"[pipeline] run_id={run_id}")
 
     if args.command == "prepare":

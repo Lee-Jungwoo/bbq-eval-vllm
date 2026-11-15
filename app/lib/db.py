@@ -15,8 +15,8 @@ import pandas as pd
 import streamlit as st
 
 APP_DIR = Path(__file__).resolve().parents[1]
-LEADERBOARD_DIR = APP_DIR.parent
-REPO_ROOT = LEADERBOARD_DIR.parent
+REPO_ROOT = APP_DIR.parent
+LEADERBOARD_DIR = REPO_ROOT / "results" / "leaderboard"
 DB_PATH = LEADERBOARD_DIR / "bbq.sqlite"
 
 # The metric definitions and palette live with the pipeline, so the app can never

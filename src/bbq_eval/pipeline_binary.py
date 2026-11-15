@@ -46,7 +46,7 @@ from pathlib import Path
 # Shared, unmodified machinery from the 3-option arm. Anything reused here is
 # arm-independent: config handling, category resolution, chat templating, and
 # the target_loc metadata join.
-from pipeline import (
+from .pipeline import (
     SINGLE_AXIS_CATEGORIES,
     assistant_prefill_for,
     encode_chat_prompt,
@@ -56,13 +56,13 @@ from pipeline import (
     resolve_categories,
     resolve_revision_sha,
 )
-from tokenizer_checker import choose_label_tokens
+from .tokenizer_checker import choose_label_tokens
 
 PIPELINE_DIR = Path(__file__).resolve().parent
-REPO_ROOT = PIPELINE_DIR.parent
+REPO_ROOT = PIPELINE_DIR.parents[1]
 # Upstream NYU BBQ files (data/*.jsonl, analysis_scripts/additional_metadata.csv).
 BBQ_ROOT = REPO_ROOT / "third_party" / "bbq"
-RUNS_DIR = PIPELINE_DIR / "runs_binary"
+RUNS_DIR = REPO_ROOT / "results" / "runs_binary"
 
 # Deliberately word-for-word the 3-option prompt with "three"->"two" and the
 # third option removed, so the only difference between the arms is the option
@@ -555,7 +555,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("command", choices=["prepare", "collect"])
-    parser.add_argument("--config", default=str(PIPELINE_DIR / "config_binary.json"))
+    parser.add_argument("--config", default=str(REPO_ROOT / "configs" / "eval" / "forced_choice.json"))
     args = parser.parse_args()
 
     config = load_config(args.config)

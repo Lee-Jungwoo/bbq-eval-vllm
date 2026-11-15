@@ -18,7 +18,7 @@ import streamlit as st
 from . import table
 from . import theme as t
 
-EXTERNAL_DIR = Path(__file__).resolve().parents[2] / "external"
+EXTERNAL_DIR = Path(__file__).resolve().parents[1] / "external"
 CSV_PATH = EXTERNAL_DIR / "bbq_external.csv"
 SOURCES_PATH = EXTERNAL_DIR / "sources.json"
 

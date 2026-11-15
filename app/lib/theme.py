@@ -12,7 +12,7 @@ from __future__ import annotations
 import plotly.graph_objects as go
 import plotly.io as pio
 
-import bbq_metrics as bm
+from bbq_eval import bbq_metrics as bm
 
 AMBIG = bm.AMBIG
 DISAMBIG = bm.DISAMBIG

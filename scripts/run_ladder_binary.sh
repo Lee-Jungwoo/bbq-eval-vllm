@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Run the whole pipeline (prepare -> logprobs -> collect -> aggregate) for a
-# ladder of models, one after another, on a single GPU.
+# Binary arm (A/B, no "unknown" option): run prepare -> logprobs -> collect ->
+# aggregate for a ladder of models, one after another, on a single GPU.
+#
+# Same script as run_ladder.sh but driving pipeline_binary.py / aggregate_binary.py
+# into runs_binary/. There is no publish step: the leaderboard is 3-option only.
 #
 # Every step is idempotent, so rerunning the script resumes rather than redoing
 # work: prepare keeps a matching requests.jsonl, serve_logprobs.py skips indices
@@ -8,19 +11,22 @@
 # is left to do), and collect only appends records that are not there yet.
 #
 # Usage:
-#   ./run_ladder.sh                        # default Qwen2.5 size ladder
-#   ./run_ladder.sh Qwen/Qwen2.5-3B-Instruct meta-llama/Llama-3.1-8B-Instruct
-#   GPU=0 BATCH_SIZE=256 ./run_ladder.sh   # env overrides
-#   GPU=0,1 ./run_ladder.sh Qwen/Qwen2.5-14B-Instruct   # shard over two GPUs
-#   LIMIT_IMAGES=0 ./run_ladder.sh mistralai/Ministral-3-3B-Instruct-2512-BF16
+#   ./run_ladder_binary.sh                        # default Qwen2.5 size ladder
+#   ./run_ladder_binary.sh Qwen/Qwen2.5-3B-Instruct meta-llama/Llama-3.1-8B-Instruct
+#   GPU=0 BATCH_SIZE=256 ./run_ladder_binary.sh   # env overrides
+#   GPU=0,1 ./run_ladder_binary.sh Qwen/Qwen2.5-14B-Instruct   # shard over two GPUs
+#   LIMIT_IMAGES=0 ./run_ladder_binary.sh mistralai/Ministral-3-3B-Instruct-2512-BF16
 #                                          # vision-capable models: see LIMIT_IMAGES below
 #
 # Long runs: launch under tmux, or
-#   nohup ./run_ladder.sh > ladder.out 2>&1 &
+#   nohup ./run_ladder_binary.sh > ladder_binary.out 2>&1 &
 set -uo pipefail
 
-PIPELINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$PIPELINE_DIR"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+# The pipeline is the bbq_eval package under src/; run its modules with -m.
+export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+SERVE="$REPO_ROOT/src/bbq_eval/serve_logprobs.py"
 
 GPU="${GPU:-1}"
 # Tensor parallelism defaults to however many devices GPU lists, so
@@ -41,7 +47,7 @@ MAX_NUM_SEQS="${MAX_NUM_SEQS:-}"
 # MAX_MODEL_LEN=1024. LIMIT_IMAGES=0 turns the image path off -- BBQ prompts are
 # text-only, so nothing is lost. Empty = vLLM default (text-only models).
 LIMIT_IMAGES="${LIMIT_IMAGES:-}"
-CONFIG="${CONFIG:-$PIPELINE_DIR/config.json}"
+CONFIG="${CONFIG:-$REPO_ROOT/configs/eval/forced_choice.json}"
 
 MODELS=("$@")
 if [ ${#MODELS[@]} -eq 0 ]; then
@@ -54,7 +60,7 @@ if [ ${#MODELS[@]} -eq 0 ]; then
     )
 fi
 
-LOG_DIR="$PIPELINE_DIR/logs/ladder_$(date +%Y%m%d_%H%M%S)"
+LOG_DIR="$REPO_ROOT/logs/ladder_binary_$(date +%Y%m%d_%H%M%S)"
 CONFIG_DIR="$LOG_DIR/configs"
 mkdir -p "$CONFIG_DIR"
 
@@ -73,6 +79,7 @@ json_get() {
     python -c 'import json, sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$1" "$2"
 }
 
+echo "[ladder] arm=binary (A/B, no unknown) -> runs_binary/"
 echo "[ladder] GPU=$GPU (tensor_parallel=$TP) dtype=$DTYPE batch=$BATCH_SIZE max_model_len=$MAX_MODEL_LEN"
 echo "[ladder] models: ${MODELS[*]}"
 echo "[ladder] logs:   $LOG_DIR"
@@ -86,8 +93,8 @@ for model in "${MODELS[@]}"; do
     echo
     echo "================================ $model ================================"
 
-    # Per-model config: everything from config.json except the model, with
-    # run_id left null so pipeline.py derives a separate run dir per model.
+    # Per-model config: everything from config_binary.json except the model, with
+    # run_id left null so pipeline_binary.py derives a separate run dir per model.
     config="$CONFIG_DIR/$short.json"
     if ! python - "$CONFIG" "$model" "$config" <<'PY'
 import json, sys
@@ -104,22 +111,22 @@ PY
     fi
 
     prepare_log="$LOG_DIR/$short.1_prepare.log"
-    if ! python pipeline.py prepare --config "$config" 2>&1 | tee "$prepare_log"; then
+    if ! python -m bbq_eval.pipeline_binary prepare --config "$config" 2>&1 | tee "$prepare_log"; then
         FAILED+=("$model (prepare)")
         continue
     fi
-    run_id="$(sed -n 's/^\[pipeline\] run_id=//p' "$prepare_log" | head -1)"
+    run_id="$(sed -n 's/^\[pipeline_binary\] run_id=\([^ ]*\).*/\1/p' "$prepare_log" | head -1)"
     if [ -z "$run_id" ]; then
         FAILED+=("$model (could not parse run_id)")
         continue
     fi
-    run_dir="$PIPELINE_DIR/runs/$run_id"
+    run_dir="$REPO_ROOT/results/runs_binary/$run_id"
 
     revision="$(json_get "$run_dir/meta.json" model_revision)"
     n_instances="$(json_get "$run_dir/meta.json" n_instances)"
     echo "[ladder] run_id=$run_id revision=$revision n_instances=$n_instances"
 
-    if ! python serve_logprobs.py \
+    if ! python "$SERVE" \
             --input "$run_dir/requests.jsonl" \
             --output "$run_dir/responses.jsonl" \
             --dtype "$DTYPE" \
@@ -141,12 +148,12 @@ PY
         echo "[ladder]          the partial run; rerun this script to fill the rest in."
     fi
 
-    if ! python pipeline.py collect --config "$config" 2>&1 | tee "$LOG_DIR/$short.3_collect.log"; then
+    if ! python -m bbq_eval.pipeline_binary collect --config "$config" 2>&1 | tee "$LOG_DIR/$short.3_collect.log"; then
         FAILED+=("$model (collect)")
         continue
     fi
 
-    python aggregate.py "$run_dir/records.jsonl" --out "$run_dir/summary.json" \
+    python -m bbq_eval.aggregate_binary "$run_dir/records.jsonl" --out "$run_dir/summary.json" \
         2>&1 | tee "$LOG_DIR/$short.4_aggregate.log"
 
     RECORDS+=("$run_dir/records.jsonl")
@@ -156,12 +163,9 @@ done
 echo
 echo "================================ ladder summary ================================"
 if [ ${#RECORDS[@]} -gt 0 ]; then
-    python aggregate.py "${RECORDS[@]}" --out "$LOG_DIR/ladder_summary.json" \
+    python -m bbq_eval.aggregate_binary "${RECORDS[@]}" --out "$LOG_DIR/ladder_summary.json" \
         2>&1 | tee "$LOG_DIR/ladder_summary.log"
-
-    # Step 5: republish every run into leaderboard/ and self-check the result
-    # against the summary.json files aggregate.py just wrote.
-    python publish.py --verify 2>&1 | tee "$LOG_DIR/publish.log"
+    # No publish step: publish.py and the leaderboard read runs/ (3-option) only.
 fi
 if [ ${#FAILED[@]} -gt 0 ]; then
     echo

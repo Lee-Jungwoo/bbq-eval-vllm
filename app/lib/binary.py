@@ -36,12 +36,12 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-import bbq_metrics as bm
+from bbq_eval import bbq_metrics as bm
 
 from . import table
 from . import theme as t
 
-RUNS_DIR = Path(__file__).resolve().parents[3] / "bbq_pipeline" / "runs_binary"
+RUNS_DIR = Path(__file__).resolve().parents[2] / "results" / "runs_binary"
 
 #: The eligibility gate from `../README.md`, the same 0.70 `publish.py` applies:
 #: a bias score is only readable when the model can answer the disambiguated

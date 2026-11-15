@@ -42,10 +42,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import bbq_metrics as bm  # noqa: E402
+from . import bbq_metrics as bm
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_VERSION = 1
 
 DEFAULT_ELIGIBILITY_THRESHOLD = 0.70
@@ -1021,8 +1020,8 @@ def git_commit() -> str | None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--runs-dir", default=str(REPO_ROOT / "bbq_pipeline" / "runs"))
-    parser.add_argument("--out", default=str(REPO_ROOT / "leaderboard"))
+    parser.add_argument("--runs-dir", default=str(REPO_ROOT / "results" / "runs"))
+    parser.add_argument("--out", default=str(REPO_ROOT / "results" / "leaderboard"))
     parser.add_argument("--db", default=None, help="default: <out>/bbq.sqlite")
     parser.add_argument("--run-id", action="append", default=None,
                         help="republish only this run (repeatable)")

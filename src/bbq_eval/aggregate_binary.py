@@ -65,7 +65,7 @@ import numpy as np
 # Only the generic resampling helpers are imported: the cluster size, the
 # multinomial draw and the percentile interval are arm-independent. The binary
 # metric definitions themselves live here and nowhere else.
-import bbq_metrics as bm
+from . import bbq_metrics as bm
 
 #: Matched to publish.py so a binary CI is read on the same terms as a 3-option one.
 DEFAULT_BOOTSTRAP = 2000
