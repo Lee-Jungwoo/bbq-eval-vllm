@@ -1,8 +1,8 @@
 # bbq-eval-vllm
 
-로컬 LLM 24개를 vLLM 오프라인 배치 추론으로 서빙해 BBQ 편향 벤치마크(9개 카테고리, 31,372문항)를 첫 토큰 logprob 방식으로 평가하고, "unknown" 선택지를 없앤 강제 선택 조건을 추가해 원 조건과 비교한 실험 코드다.
+로컬 LLM 24개를 vLLM 오프라인 배치 추론으로 서빙해 BBQ 편향 벤치마크(9개 카테고리, 31,372문항)를 첫 토큰 logprob 방식으로 평가하고, "unknown" 선택지를 없앤 강제 선택 조건을 추가해 원 조건과 비교한 실험 코드입니다.
 
-서울대학교 융합과학기술대학원 인간중심컴퓨팅연구실 하계 연구 인턴(2026년 7월부터 8월) 기간에 진행했다.
+HCCL 하계 연구 인턴(2026년 7월~8월) 기간에 진행했습니다.
 
 빠르게 볼 곳:
 
@@ -15,20 +15,20 @@
 | 결과 요약 | [`results/summary_original.csv`](results/summary_original.csv), [`results/summary_forced_choice.csv`](results/summary_forced_choice.csv) |
 | 실행 로그(엔진 설정의 실제 기록) | [`results/serving_logs/`](results/serving_logs/) |
 
-## 1. 무엇을 측정했나
+## 1. 측정 내용
 
 ### BBQ
 
-[BBQ(Bias Benchmark for QA, Parrish et al., Findings of ACL 2022)](https://aclanthology.org/2022.findings-acl.165/)는 두 인물 중 누가 질문에 해당하는지 고르게 하는 객관식 QA로, 미국 영어 맥락의 사회적 고정관념을 다룬다. 문항마다 선택지는 두 집단과 "알 수 없음(unknown)" 하나, 모두 세 개다. 맥락은 두 종류다.
+[BBQ(Bias Benchmark for QA, Parrish et al., Findings of ACL 2022)](https://aclanthology.org/2022.findings-acl.165/)는 두 인물 중 누가 질문에 해당하는지 고르게 하는 객관식 QA로, 미국 영어 맥락의 사회적 고정관념을 다룹니다. 문항마다 선택지는 두 집단과 "알 수 없음(unknown)" 하나, 모두 세 개입니다. 맥락은 두 종류입니다.
 
-- 모호한 맥락(ambig): 답을 정할 단서가 없다. 정답은 unknown이다.
-- 명확한 맥락(disambig): 맥락에 답이 있다. 정답은 두 집단 중 하나다.
+- 모호한 맥락(ambig): 답을 정할 단서가 없습니다. 정답은 unknown입니다.
+- 명확한 맥락(disambig): 맥락에 답이 있습니다. 정답은 두 집단 중 하나입니다.
 
-이 레포는 단일 축 9개 카테고리(Age, Disability_status, Gender_identity, Nationality, Physical_appearance, Race_ethnicity, Religion, SES, Sexual_orientation) 31,372문항을 쓴다. 교차 카테고리 2개는 제외했다.
+이 레포는 단일 축 9개 카테고리(Age, Disability_status, Gender_identity, Nationality, Physical_appearance, Race_ethnicity, Religion, SES, Sexual_orientation) 31,372문항을 씁니다. 교차 카테고리 2개는 제외했습니다.
 
 ### 채점 방식
 
-모델이 텍스트를 생성하게 하지 않고, 프롬프트 바로 다음 첫 토큰 위치에서 답 문자 토큰(A, B, C)의 logprob을 받아 가장 큰 쪽을 예측으로 쓴다. 생성 텍스트를 파싱할 필요가 없고 문항당 forward pass가 한 번이다.
+모델이 텍스트를 생성하게 하지 않고, 프롬프트 바로 다음 첫 토큰 위치에서 답 문자 토큰(A, B, C)의 logprob을 받아 가장 큰 쪽을 예측으로 씁니다. 생성 텍스트를 파싱할 필요가 없고 문항당 forward pass가 한 번입니다.
 
 주요 지표(정의는 [`src/bbq_eval/bbq_metrics.py`](src/bbq_eval/bbq_metrics.py)와 [`docs/pipeline.md`](docs/pipeline.md)):
 
@@ -46,28 +46,28 @@
 | 모호한 맥락의 정답 | unknown | 없음 (`label`, `accuracy_ambig`가 null) |
 | 코드 | `pipeline.py`, `aggregate.py` | `pipeline_binary.py`, `aggregate_binary.py` |
 | 결과 | `results/runs/` (run_id에 표시 없음) | `results/runs_binary/` (run_id에 `_ab_`) |
-| 서빙 | 같음 (`serve_logprobs.py`는 라벨 토큰 수만 다르게 받는다) | 같음 |
+| 서빙 | 같음 (`serve_logprobs.py`는 라벨 토큰 수만 다르게 받습니다) | 같음 |
 
-두 조건의 차이는 선택지 집합뿐이다. 남은 두 선택지는 원래 순서를 유지하므로, 선택지 하나를 뺀 것 말고 새로운 위치 편향을 만들지 않는다.
+두 조건의 차이는 선택지 집합뿐입니다. 남은 두 선택지는 원래 순서를 유지하므로, 선택지 하나를 뺀 것 말고 새로운 위치 편향을 만들지 않습니다.
 
-### 왜 강제 선택 조건을 추가했나
+### 강제 선택 조건을 추가한 이유
 
-원 조건에서 모호한 맥락의 정답은 unknown이므로 `accuracy_ambig`는 사실상 모델이 답을 피한 비율이다. 그리고 `s_AMB`에는 `(1 - accuracy_ambig)`가 곱해지므로, 모호한 문항에서 거의 늘 unknown을 고르는 모델은 실제로 답한 문항에서 고정관념 쪽으로 강하게 기울어 있어도 `s_AMB`가 0에 가깝게 나온다. 회피와 공정함이 점수에서 구분되지 않는다.
+원 조건에서 모호한 맥락의 정답은 unknown이므로 `accuracy_ambig`는 사실상 모델이 답을 피한 비율입니다. 그리고 `s_AMB`에는 `(1 - accuracy_ambig)`가 곱해지므로, 모호한 문항에서 거의 늘 unknown을 고르는 모델은 실제로 답한 문항에서 고정관념 쪽으로 강하게 기울어 있어도 `s_AMB`가 0에 가깝게 나옵니다. 회피와 공정함이 점수에서 구분되지 않습니다.
 
-강제 선택 조건은 회피할 수 없게 해서, 단서가 없을 때 모델이 어느 집단을 고르는지를 모든 문항에서 본다. 이 조건의 `s_AMB`는 보정이 없는 값이라 원 조건의 `s_AMB`가 아니라 `s_AMB_unscaled`와 비교해야 한다.
+강제 선택 조건은 회피할 수 없게 해서, 단서가 없을 때 모델이 어느 집단을 고르는지를 모든 문항에서 봅니다. 이 조건의 `s_AMB`는 보정이 없는 값이라 원 조건의 `s_AMB`가 아니라 `s_AMB_unscaled`와 비교해야 합니다.
 
 ## 2. 서빙 구성
 
 ### 방식
 
-- OpenAI 호환 HTTP 서버가 아니라 vLLM의 오프라인 `LLM` 클래스를 쓰는 배치 추론이다.
-- 로컬에서 chat template 적용과 토큰화까지 끝낸 `requests.jsonl`을 GPU 서버로 보내고, 서버에서는 `serve_logprobs.py` 한 파일만 돌린다. 출력은 묶음마다 flush되어 중단 후 재개할 수 있다.
-- `SamplingParams(max_tokens=1, temperature=1.0, top_p=1.0, logprobs=50)`. 샘플된 토큰은 쓰지 않고 첫 토큰 logprob만 읽는다.
-- `apply_chat_template(..., add_generation_prompt=True, enable_thinking=False)`. gpt-oss만 `<|channel|>final<|message|>` prefill을 붙인다.
+- OpenAI 호환 HTTP 서버가 아니라 vLLM의 오프라인 `LLM` 클래스를 쓰는 배치 추론입니다.
+- 로컬에서 chat template 적용과 토큰화까지 끝낸 `requests.jsonl`을 GPU 서버로 보내고, 서버에서는 `serve_logprobs.py` 한 파일만 돌립니다. 출력은 묶음마다 flush되어 중단 후 재개할 수 있습니다.
+- `SamplingParams(max_tokens=1, temperature=1.0, top_p=1.0, logprobs=50)`. 샘플된 토큰은 쓰지 않고 첫 토큰 logprob만 읽습니다.
+- `apply_chat_template(..., add_generation_prompt=True, enable_thinking=False)`. gpt-oss만 `<|channel|>final<|message|>` prefill을 붙입니다.
 
 ### 모델별 설정
 
-하드웨어는 연구실 GPU 서버의 NVIDIA GeForce RTX 3090 24GB 2장이다. 아래 값은 모두 각 run의 vLLM 엔진 로그(`non-default args`)에서 확인한 실제 실행값이고, 같은 값이 [`configs/serving/`](configs/serving/)의 yaml에 조건별 블록으로 들어 있다. 칸에 값이 하나면 두 조건이 같고, "a / b"면 원 조건 a, 강제 선택 조건 b다. 예외로 원 조건 Qwen2.5-7B는 래더 밖에서 손으로 돌려 엔진 로그가 없고, 값은 서버 셸 히스토리와 당시 스크립트 기본값에서 왔다.
+하드웨어는 연구실 GPU 서버의 NVIDIA GeForce RTX 3090 24GB 2장입니다. 아래 값은 모두 각 run의 vLLM 엔진 로그(`non-default args`)에서 확인한 실제 실행값이고, 같은 값이 [`configs/serving/`](configs/serving/)의 yaml에 조건별 블록으로 들어 있습니다. 칸에 값이 하나면 두 조건이 같고, "a / b"면 원 조건 a, 강제 선택 조건 b입니다. 예외로 원 조건 Qwen2.5-7B는 래더 밖에서 손으로 돌려 엔진 로그가 없고, 값은 서버 셸 히스토리와 당시 스크립트 기본값에서 가져왔습니다.
 
 | 모델 | 파라미터(B) | vLLM | dtype | max_model_len | gpu_memory_utilization | 동시성 (max_num_seqs, batch) | GPU (RTX 3090 24GB) |
 |---|---|---|---|---|---|---|---|
@@ -96,10 +96,10 @@
 | [Qwen3.5-4B](configs/serving/qwen3.5-4b.yaml) | 4 | 0.26.0 | bfloat16 | 1024 | 0.90 | 64, 512 / 256 (기본값), 512 | 2장 / 1장 |
 | [Qwen3.5-9B](configs/serving/qwen3.5-9b.yaml) | 9 | 0.26.0 | bfloat16 | 1024 | 0.90 | 64, 512 | 2장 / 1장 |
 
-- 동시성: vLLM 스케줄러의 `max_num_seqs`와 `serve_logprobs.py`가 `llm.generate()` 한 번에 넘기는 프롬프트 수(batch)다. `max_num_seqs`를 넘기지 않은 run은 vLLM 기본값 256으로 돌았다(두 버전 모두 오류 메시지에서 확인).
-- `max_num_seqs` 64는 모두 메모리 문제 때문에 낮춘 값이다. 14B급 모델은 sampler warmup에서 메모리가 부족했고, Qwen3.5-9B는 Mamba cache 블록이 부족했다. 경위는 [`docs/serving.md`](docs/serving.md#설정이-바뀐-경위-로그에-남은-실패-시도)에 있다.
-- quantization 인자는 넘긴 적이 없다. gpt-oss-20b만 엔진이 체크포인트 설정에 따라 MXFP4(`gpt_oss_mxfp4`)를 적용했다.
-- 비전 입력을 지원하는 체크포인트(Ministral, gemma-4)는 `limit_mm_per_prompt={"image": 0}`으로 이미지 경로를 껐다. 강제 선택 래더는 모든 모델에 이 값을 넘겼다.
+- 동시성: vLLM 스케줄러의 `max_num_seqs`와 `serve_logprobs.py`가 `llm.generate()` 한 번에 넘기는 프롬프트 수(batch)입니다. `max_num_seqs`를 넘기지 않은 run은 vLLM 기본값 256으로 돌았습니다(두 버전 모두 오류 메시지에서 확인).
+- `max_num_seqs` 64는 모두 메모리 문제 때문에 낮춘 값입니다. 14B급 모델은 sampler warmup에서 메모리가 부족했고, Qwen3.5-9B는 Mamba cache 블록이 부족했습니다. 경위는 [`docs/serving.md`](docs/serving.md#설정이-바뀐-경위-로그에-남은-실패-시도)에 있습니다.
+- quantization 인자는 넘긴 적이 없습니다. gpt-oss-20b만 엔진이 체크포인트 설정에 따라 MXFP4(`gpt_oss_mxfp4`)를 적용했습니다.
+- 비전 입력을 지원하는 체크포인트(Ministral, gemma-4)는 `limit_mm_per_prompt={"image": 0}`으로 이미지 경로를 껐습니다. 강제 선택 래더는 모든 모델에 이 값을 넘겼습니다.
 
 ## 3. 평가 파이프라인 흐름
 
@@ -117,11 +117,11 @@
 ```bash
 pip install vllm pyyaml           # 로그로 확인된 버전은 0.10.2 (Qwen2.5 run)
 
-# 준비된 run 디렉터리의 requests.jsonl을 읽어 responses.jsonl을 채운다
+# 준비된 run 디렉터리의 requests.jsonl을 읽어 responses.jsonl을 채웁니다
 python scripts/serve.py --config configs/serving/qwen2.5-3b-instruct.yaml \
     --run-dir results/runs/Qwen2.5-3B-Instruct_bfloat16_6db43b09 --gpu 0
 
-# 서버에 레포 전체를 두지 않을 때: serve_logprobs.py와 requests.jsonl만 복사
+# 서버에 레포 전체를 두지 않을 때: serve_logprobs.py와 requests.jsonl만 복사합니다
 python serve_logprobs.py --input requests.jsonl --output responses.jsonl \
     --dtype bfloat16 --revision <sha> --max-model-len 1024 --batch-size 512 \
     --tensor-parallel-size 1 --gpu-memory-utilization 0.90
@@ -132,7 +132,7 @@ python serve_logprobs.py --input requests.jsonl --output responses.jsonl \
 ```bash
 pip install -r requirements.txt
 
-# 한 모델, 한 조건, 네 단계(prepare, serve, collect, aggregate)를 차례로
+# 한 모델, 한 조건, 네 단계(prepare, serve, collect, aggregate)를 차례로 실행합니다
 python scripts/run_eval.py --condition original      --serving configs/serving/qwen3-8b.yaml
 python scripts/run_eval.py --condition forced_choice --serving configs/serving/qwen3-8b.yaml
 
@@ -140,7 +140,7 @@ python scripts/run_eval.py --condition forced_choice --serving configs/serving/q
 python scripts/run_eval.py --condition original --serving configs/serving/qwen3-8b.yaml --steps prepare
 python scripts/run_eval.py --condition original --serving configs/serving/qwen3-8b.yaml --steps collect,aggregate
 
-# 실제 실험에 쓴 드라이버: 모델 목록을 차례로 (env로 GPU, TP, MAX_NUM_SEQS 등 지정)
+# 실제 실험에 쓴 드라이버: 모델 목록을 차례로 실행합니다 (env로 GPU, TP, MAX_NUM_SEQS 등 지정)
 scripts/run_ladder.sh Qwen/Qwen2.5-0.5B-Instruct Qwen/Qwen2.5-1.5B-Instruct
 LIMIT_IMAGES=0 scripts/run_ladder_binary.sh mistralai/Ministral-3-3B-Instruct-2512-BF16
 ```
@@ -149,7 +149,7 @@ LIMIT_IMAGES=0 scripts/run_ladder_binary.sh mistralai/Ministral-3-3B-Instruct-25
 
 ```bash
 export PYTHONPATH=$PWD/src
-python -m bbq_eval.publish --verify      # 원 조건 run 전체를 다시 발행하고 aggregate.py 결과와 대조
+python -m bbq_eval.publish --verify      # 원 조건 run 전체를 다시 발행하고 aggregate.py 결과와 대조합니다
 python scripts/export_summary.py         # results/summary_*.csv
 ```
 
@@ -168,11 +168,11 @@ streamlit run app/Home.py
 | 4_Binary_leaderboard | 강제 선택 조건 순위 |
 | 5_Arm_comparison | 같은 모델의 두 조건 순위와 순위 변화 |
 
-자세한 내용은 [`docs/pipeline.md`](docs/pipeline.md), [`docs/leaderboard.md`](docs/leaderboard.md).
+자세한 내용은 [`docs/pipeline.md`](docs/pipeline.md)와 [`docs/leaderboard.md`](docs/leaderboard.md)에 있습니다.
 
 ## 4. 결과 요약
 
-아래 수치는 모두 [`results/summary_original.csv`](results/summary_original.csv)와 [`results/summary_forced_choice.csv`](results/summary_forced_choice.csv)에 있는 값이다(소수 셋째 자리 반올림). 이 CSV들은 커밋된 `summary.json`과 `leaderboard.csv`에서 값을 옮긴 것이다. 모델당 조건별로 한 번씩 실행했다.
+아래 수치는 모두 [`results/summary_original.csv`](results/summary_original.csv)와 [`results/summary_forced_choice.csv`](results/summary_forced_choice.csv)에 있는 값입니다(소수 셋째 자리 반올림). 이 CSV들은 커밋된 `summary.json`과 `leaderboard.csv`에서 값을 옮긴 것입니다. 모델당 조건별로 한 번씩 실행했습니다.
 
 | 모델 | 원 acc_dis | 원 acc_amb | 원 s_DIS | 원 s_AMB | 원 s_AMB_unscaled | 강제 acc_dis | 강제 s_DIS | 강제 s_AMB |
 |---|---|---|---|---|---|---|---|---|
@@ -201,21 +201,21 @@ streamlit run app/Home.py
 | Qwen3.5-4B | 0.950 | 0.921 | +0.020 | +0.046 | +0.577 | 0.983 | +0.017 | +0.293 |
 | Qwen3.5-9B | 0.936 | 0.967 | +0.020 | +0.021 | +0.622 | 0.988 | +0.011 | +0.347 |
 
-표에서 읽을 수 있는 것:
+표에서 읽을 수 있는 점은 다음과 같습니다.
 
-- 원 조건에서 `accuracy_ambig`가 0.9 이상인 모델이 9개다(모호한 문항의 90% 이상에서 unknown을 고름). 이 9개의 `s_AMB`는 0.003에서 0.046 사이지만, 같은 모델의 `s_AMB_unscaled`는 0.362에서 0.647 사이다. 원 조건의 `s_AMB`가 작게 나온 데에는 회피 비율이 크게 작용한다.
-- 원 조건에서 `accuracy_disambig` 0.7 이상으로 순위에 든 20개 모델의 강제 선택 `s_AMB`는 0.063에서 0.347 사이다. 같은 20개의 원 조건 `s_AMB`는 0.003에서 0.167 사이다.
-- 24개 모델 모두 강제 선택 `s_AMB`가 원 조건 `s_AMB_unscaled`보다 작다. 단, 원 조건 `s_AMB_unscaled`는 모델이 unknown을 고르지 않은 일부 문항에서만 계산되고 강제 선택 `s_AMB`는 모든 문항에서 계산되므로, 두 값은 같은 문항 집합에 대한 값이 아니다.
-- 명확한 맥락 정확도는 24개 중 21개 모델에서 강제 선택 조건이 원 조건 이상이다.
+- 원 조건에서 `accuracy_ambig`가 0.9 이상인 모델이 9개입니다(모호한 문항의 90% 이상에서 unknown 선택). 이 9개의 `s_AMB`는 0.003에서 0.046 사이이지만, 같은 모델의 `s_AMB_unscaled`는 0.362에서 0.647 사이입니다. 원 조건의 `s_AMB`가 작게 나온 데에는 회피 비율이 크게 작용합니다.
+- 원 조건에서 `accuracy_disambig` 0.7 이상으로 순위에 든 20개 모델의 강제 선택 `s_AMB`는 0.063에서 0.347 사이입니다. 같은 20개의 원 조건 `s_AMB`는 0.003에서 0.167 사이입니다.
+- 24개 모델 모두 강제 선택 `s_AMB`가 원 조건 `s_AMB_unscaled`보다 작습니다. 다만 원 조건 `s_AMB_unscaled`는 모델이 unknown을 고르지 않은 일부 문항에서만 계산되고 강제 선택 `s_AMB`는 모든 문항에서 계산되므로, 두 값은 같은 문항 집합에 대한 값이 아닙니다.
+- 명확한 맥락 정확도는 24개 중 21개 모델에서 강제 선택 조건이 원 조건 이상입니다.
 
-해석할 때 함께 볼 진단값(CSV에 있음):
+해석할 때 함께 봐야 할 진단값은 다음과 같습니다(CSV에 포함되어 있습니다).
 
-- 강제 선택 조건에서 두 라벨 토큰의 확률 합(`mean_prob_mass_captured`)이 0.9 미만인 모델이 있다: gemma-4-12B-it 0.576, gemma-4-E4B-it 0.807, Qwen2.5-14B-Instruct 0.860. 원 조건에서는 24개 모두 0.989 이상이다.
-- 강제 선택 조건에서 A를 고른 비율(`letter_A_rate`)이 0.029(Llama-3.2-1B)에서 0.862(Qwen3.5-0.8B)까지 퍼져 있다. 0.5에서 먼 작은 모델은 위치 편향이 크다.
-- Qwen2.5-14B-Instruct는 강제 선택 조건에서 100문항의 두 라벨 토큰이 모두 상위 50 logprob 밖이어서 예측 없음으로 처리되었다(`n_unmeasurable`).
-- 원 조건 순위의 인접 순위 19쌍 중 bootstrap 95% CI로 구분되는 쌍은 4쌍뿐이다([`docs/leaderboard.md`](docs/leaderboard.md#confidence-intervals)).
+- 강제 선택 조건에서 두 라벨 토큰의 확률 합(`mean_prob_mass_captured`)이 0.9 미만인 모델이 있습니다: gemma-4-12B-it 0.576, gemma-4-E4B-it 0.807, Qwen2.5-14B-Instruct 0.860. 원 조건에서는 24개 모두 0.989 이상입니다.
+- 강제 선택 조건에서 A를 고른 비율(`letter_A_rate`)이 0.029(Llama-3.2-1B)에서 0.862(Qwen3.5-0.8B)까지 퍼져 있습니다. 0.5에서 먼 작은 모델은 위치 편향이 큽니다.
+- Qwen2.5-14B-Instruct는 강제 선택 조건에서 100문항의 두 라벨 토큰이 모두 상위 50 logprob 밖이어서 예측 없음으로 처리되었습니다(`n_unmeasurable`).
+- 원 조건 순위의 인접 순위 19쌍 중 bootstrap 95% CI로 구분되는 쌍은 4쌍뿐입니다([`docs/leaderboard.md`](docs/leaderboard.md#confidence-intervals)).
 
-throughput, latency, GPU 메모리 사용량은 측정하지 않았다.
+throughput, latency, GPU 메모리 사용량은 측정하지 않았습니다.
 
 ## 5. 재현 방법과 디렉터리 구조
 
@@ -225,19 +225,19 @@ throughput, latency, GPU 메모리 사용량은 측정하지 않았다.
 git clone <this repo> && cd bbq-eval-vllm
 pip install -r requirements.txt
 
-# GPU 없이 확인: 앞 5문항의 프롬프트와 serve 명령을 출력하고 기록된 run과 비교
-# (파일을 쓰지 않음, HF에서 토크나이저를 받는다)
+# GPU 없이 확인: 앞 5문항의 프롬프트와 serve 명령을 출력하고 기록된 run과 비교합니다
+# (파일을 쓰지 않으며, HF에서 토크나이저를 받습니다)
 python scripts/run_eval.py --condition original --serving configs/serving/qwen3-0.6b.yaml --dry-run 5
 
 # 커밋된 결과 다시 보기
 python scripts/export_summary.py
 ```
 
-- 프롬프트 템플릿과 평가 설정이 같으면 run_id가 같게 나온다. `configs/serving/*.yaml`과 `configs/eval/*.json`으로 계산한 run_id 48개가 `results/` 아래 기록된 run과 모두 일치한다.
-- gpt-oss-20b의 chat template은 실행 날짜(`Current date: ...`)를 system 메시지에 넣는다. 그래서 이 모델은 다시 돌리면 프롬프트가 그 한 줄만큼 달라진다(기록된 run은 2026-08-19). 다른 모델의 첫 문항 프롬프트는 기록과 바이트 단위로 같게 나오는 것을 Qwen3-0.6B로 확인했다.
-- 모델 revision은 commit sha로 고정되어 있다(`configs/serving/*.yaml`, `results/runs*/*/meta.json`).
-- 원시 출력(`requests`, `instances`, `responses`, `records.jsonl`, run당 최대 약 60MB)과 `bbq.sqlite`는 커밋하지 않는다. 그래서 `publish.py --verify`와 run 재집계는 원시 출력을 가진 머신에서만 된다. 강제 선택 조건의 원시 출력은 이 레포를 만든 로컬 머신에도 없다.
-- Mistral 계열은 `mistral_common` 설치 여부에 따라 토크나이저가 달라진다. `prepare`는 `serve_logprobs.py`와 같은 환경에서 돌려야 한다([`docs/pipeline.md`](docs/pipeline.md#vision-capable-models)).
+- 프롬프트 템플릿과 평가 설정이 같으면 run_id가 같게 나옵니다. `configs/serving/*.yaml`과 `configs/eval/*.json`으로 계산한 run_id 48개가 `results/` 아래 기록된 run과 모두 일치합니다.
+- gpt-oss-20b의 chat template은 실행 날짜(`Current date: ...`)를 system 메시지에 넣습니다. 그래서 이 모델은 다시 돌리면 프롬프트가 그 한 줄만큼 달라집니다(기록된 run은 2026-08-19). 다른 모델의 첫 문항 프롬프트는 기록과 바이트 단위로 같게 나오는 것을 Qwen3-0.6B로 확인했습니다.
+- 모델 revision은 commit sha로 고정되어 있습니다(`configs/serving/*.yaml`, `results/runs*/*/meta.json`).
+- 원시 출력(`requests`, `instances`, `responses`, `records.jsonl`, run당 최대 약 60MB)과 `bbq.sqlite`는 커밋하지 않습니다. 그래서 `publish.py --verify`와 run 재집계는 원시 출력을 가진 머신에서만 가능합니다. 강제 선택 조건의 원시 출력은 이 레포를 만든 로컬 머신에도 없습니다.
+- Mistral 계열은 `mistral_common` 설치 여부에 따라 토크나이저가 달라집니다. `prepare`는 `serve_logprobs.py`와 같은 환경에서 돌려야 합니다([`docs/pipeline.md`](docs/pipeline.md#vision-capable-models)).
 
 ### 디렉터리 구조
 
@@ -279,17 +279,17 @@ third_party/bbq/              원본 NYU BBQ (데이터, 템플릿, R 채점 스
 
 ## 6. 한계
 
-- 연구실 내부 실험이다. 외부 검증을 받거나 논문으로 정리된 결과가 아니다.
-- 프롬프트 템플릿 하나, 첫 토큰 logprob 채점 하나로만 측정했다. 프롬프트 문구, few-shot 여부, 생성 후 파싱 방식이 바뀌면 결과가 달라질 수 있으며 이 레포는 그 민감도를 재지 않았다.
-- 모델당 조건별 실행은 한 번이다. 신뢰구간은 문항(템플릿 묶음) 재표집 bootstrap으로만 냈다.
-- 두 조건의 서빙 환경이 완전히 같지 않다. 원 조건 Qwen2.5, Llama, Qwen3 0.6B부터 8B는 vLLM 0.10.2, 나머지와 강제 선택 조건 전부는 0.26.0으로 돌았고, 일부 모델은 조건마다 TP도 다르다. 이 차이가 logprob에 주는 영향은 확인하지 않았다.
-- 서버 엔진 로그는 레포에 일부(Qwen2.5 래더)만 커밋했다. 나머지 run의 인자는 서버 로그에서 옮겨 적은 값이다.
-- throughput, latency 같은 서빙 성능은 측정하지 않았다. 이 레포는 서빙 성능 벤치마크가 아니라 서빙을 이용한 평가 파이프라인이다.
-- 강제 선택 조건은 일부 모델에서 라벨 토큰 확률 합이 낮고(최저 0.576) 위치 편향이 크다. 이런 모델의 강제 선택 결과는 조심해서 읽어야 한다.
-- BBQ 자체의 범위를 따른다. 미국 영어 맥락의 고정관념만 다루며, 이 레포는 교차 카테고리 2개를 제외했다.
+- 연구실 내부 실험입니다. 외부 검증을 받거나 논문으로 정리된 결과가 아닙니다.
+- 프롬프트 템플릿 하나, 첫 토큰 logprob 채점 하나로만 측정했습니다. 프롬프트 문구, few-shot 여부, 생성 후 파싱 방식이 바뀌면 결과가 달라질 수 있으며 이 레포는 그 민감도를 재지 않았습니다.
+- 모델당 조건별 실행은 한 번입니다. 신뢰구간은 문항(템플릿 묶음) 재표집 bootstrap으로만 냈습니다.
+- 두 조건의 서빙 환경이 완전히 같지 않습니다. 원 조건 Qwen2.5, Llama, Qwen3 0.6B부터 8B는 vLLM 0.10.2, 나머지와 강제 선택 조건 전부는 0.26.0으로 돌았고, 일부 모델은 조건마다 TP도 다릅니다. 이 차이가 logprob에 주는 영향은 확인하지 않았습니다.
+- 서버 엔진 로그는 레포에 일부(Qwen2.5 래더)만 커밋했습니다. 나머지 run의 인자는 서버 로그에서 옮겨 적은 값입니다.
+- throughput, latency 같은 서빙 성능은 측정하지 않았습니다. 이 레포는 서빙 성능 벤치마크가 아니라 서빙을 이용한 평가 파이프라인입니다.
+- 강제 선택 조건은 일부 모델에서 라벨 토큰 확률 합이 낮고(최저 0.576) 위치 편향이 큽니다. 이런 모델의 강제 선택 결과는 조심해서 읽어야 합니다.
+- BBQ 자체의 범위를 따릅니다. 미국 영어 맥락의 고정관념만 다루며, 이 레포는 교차 카테고리 2개를 제외했습니다.
 
 ## 출처와 라이선스
 
-BBQ 데이터, 템플릿, 원본 채점 스크립트는 [nyu-mll/BBQ](https://github.com/nyu-mll/BBQ)에서 왔고 `third_party/bbq/`에 그대로 두었다. 라이선스는 루트의 [`LICENSE`](LICENSE)(CC BY 4.0)다.
+BBQ 데이터, 템플릿, 원본 채점 스크립트는 [nyu-mll/BBQ](https://github.com/nyu-mll/BBQ)에서 왔고 `third_party/bbq/`에 그대로 두었습니다. 라이선스는 루트의 [`LICENSE`](LICENSE)(CC BY 4.0)입니다.
 
 > Alicia Parrish, Angelica Chen, Nikita Nangia, Vishakh Padmakumar, Jason Phang, Jana Thompson, Phu Mon Htut, and Samuel R. Bowman. 2022. BBQ: A Hand-Built Bias Benchmark for Question Answering. Findings of ACL 2022.
